@@ -192,7 +192,7 @@ class Circuit:
         return self.m_log(log_qb, "Z", label)
 
     def log_QST(self, log_qbs: List[LogicalQubit]) -> List[Tuple[str, Circuit]]:
-        if type(log_qbs) != List:
+        if type(log_qbs) != list:
             log_qbs = [log_qbs]
 
         # bases = list(itertools.product(['X', 'Y', 'Z'], repeat=len(log_qbs)))

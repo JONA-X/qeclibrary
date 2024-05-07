@@ -10,6 +10,7 @@ requirements = [
     "ipykernel",
     "pydantic",
     "numpy",
+    "stim",
 ]
 
 setup(
