@@ -55,3 +55,10 @@ class PauliOp:
             "Y": y_qubits,
             "Z": z_qubits,
         }
+
+    def length(self):
+        length = 0
+        for pauli in self.pauli_string:
+            if pauli != "I":
+                length += 1
+        return length

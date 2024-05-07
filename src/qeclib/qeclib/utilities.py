@@ -28,3 +28,41 @@ def check_commutation_of_pauli_string(str1, str2) -> bool:
             if str1[i] != str2[i]:
                 do_commute = not (do_commute)
     return do_commute
+
+
+def pauli_product(pauli1: str, pauli2: str) -> str:
+    if len(pauli1) != len(pauli2):
+        raise ValueError("Pauli strings must have the same length")
+
+    product = ""
+    sign = 1
+    for i in range(len(pauli1)):
+        if pauli1[i] == "I":
+            product += pauli2[i]
+        elif pauli2[i] == "I":
+            product += pauli1[i]
+        elif pauli1[i] == pauli2[i]:
+            product += "I"
+        else:
+            if pauli1[i] == "X":
+                if pauli2[i] == "Y":
+                    product += "Z"
+                    sign *= 1j
+                else:
+                    product += "Y"
+                    sign *= -1j
+            elif pauli1[i] == "Y":
+                if pauli2[i] == "X":
+                    product += "Z"
+                    sign *= -1j
+                else:
+                    product += "X"
+                    sign *= 1j
+            else:
+                if pauli2[i] == "X":
+                    product += "Y"
+                    sign *= 1j
+                else:
+                    product += "X"
+                    sign *= -1j
+    return product, sign
