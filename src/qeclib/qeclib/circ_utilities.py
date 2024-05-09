@@ -8,7 +8,9 @@ from .logical_qubit import LogicalQubit
 
 
 def circ_log_QST_results(
-    circuit, log_qbs: Union[None, List[LogicalQubit]] = None, num_shots: int = 1000
+    circuit,
+    log_qbs: Union[None, List[LogicalQubit]] = None,
+    num_shots: int = 1000,
 ) -> Dict[str, float]:
     if log_qbs == None:
         log_qbs = circuit.logical_qubits
@@ -18,10 +20,12 @@ def circ_log_QST_results(
         res = stim.Circuit(c.convert_to_stim()).compile_sampler().sample(num_shots)
         summed_res = 0
         for r in res:
+            shot_readout = 0
             mmts = c.dict_m_labels_to_res(r)
             for qb in log_qbs:
                 final_readout = np.array(mmts[f"QST_{qb.id}"], dtype=int)
-                summed_res += np.sum(final_readout) % 2
+                shot_readout += np.sum(final_readout)
+            summed_res += shot_readout % 2
         summed_res /= num_shots
         results_dict[basis] = summed_res
     return results_dict
