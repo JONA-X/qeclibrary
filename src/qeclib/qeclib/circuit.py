@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Union, List, Optional, Dict, Tuple
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 import uuid
 import itertools
@@ -67,11 +67,15 @@ class Circuit:
 
     def remove_logical_qubit(self, logical_qubit: LogicalQubit) -> bool:
         if not self.is_log_qb_id_contained(logical_qubit.id):
-            raise ValueError("Logical qubit does not exist on the processor and cannot be deleted.")
+            raise ValueError(
+                "Logical qubit does not exist on the processor and cannot be deleted."
+            )
 
         for i, qb in enumerate(self.logical_qubits):
             if qb.id == logical_qubit.id:
-                self.logical_qubits[i].exists = False # Mark the original logical qubit as non-existent
+                self.logical_qubits[i].exists = (
+                    False  # Mark the original logical qubit as non-existent
+                )
                 del self.logical_qubits[i]
                 return True
 
@@ -80,7 +84,7 @@ class Circuit:
     def _log_qb_valid_check(self, log_qb: LogicalQubit) -> True:
         if log_qb not in self.logical_qubits:
             raise ValueError("Logical qubit does not exist in this circuit.")
-        if log_qb.exists == False:
+        if log_qb.exists is False:
             raise ValueError(
                 "Logical qubit does not exist anymore due to a previous merge or split."
             )
@@ -142,7 +146,7 @@ class Circuit:
         # Operations of the circuit
         for op in self._circuit:
             stim_circ += internal_op_to_stim_map[op[0]]
-            if type(op[1]) == int:
+            if isinstance(op[1], int):
                 stim_circ += f" {op[1]}"
             else:
                 for qb in op[1]:
@@ -165,8 +169,7 @@ class Circuit:
         return uuids
 
     def add_par_def_syndrome_extraction_circuit(
-        self,
-        log_qbs: List[LogicalQubit] = []
+        self, log_qbs: List[LogicalQubit] = []
     ) -> None:
         if len(log_qbs) == 0:
             log_qbs = self.logical_qubits
@@ -180,6 +183,8 @@ class Circuit:
         return uuids
 
     def m_log(self, log_qb: LogicalQubit, basis: str, label: str = "") -> str:
+        self._log_qb_valid_check(log_qb) # Raise exception if the provided logical qubit is not valid
+
         if basis == "X":
             m_circ = log_qb.m_log_x()
             n = log_qb.log_x.length()
@@ -188,7 +193,9 @@ class Circuit:
         elif basis == "Y":
             m_circ = log_qb.m_log_y()
             n = log_qb.log_y.length()
-            corrections_list = log_qb.log_x_corrections + log_qb.log_z_corrections # Do both corrections
+            corrections_list = (
+                log_qb.log_x_corrections + log_qb.log_z_corrections
+            )  # Do both corrections
             log_qb.log_x_corrections = []  # Clear the corrections list
             log_qb.log_z_corrections = []  # Clear the corrections list
         elif basis == "Z":
@@ -217,7 +224,7 @@ class Circuit:
         return self.m_log(log_qb, "Z", label)
 
     def log_QST(self, log_qbs: List[LogicalQubit]) -> List[Tuple[str, Circuit]]:
-        if type(log_qbs) != list:
+        if not isinstance(log_qbs, list):
             log_qbs = [log_qbs]
 
         # bases = list(itertools.product(['X', 'Y', 'Z'], repeat=len(log_qbs)))
@@ -256,17 +263,27 @@ class Circuit:
     ) -> Tuple[str, LogicalQubit, LogicalQubit]:
         self._log_qb_valid_check(log_qb)
 
-        split_circ, new_log_qb1, new_log_qb2, split_operator = log_qb.split(split_qbs, new_ids)
+        split_circ, new_log_qb1, new_log_qb2, split_operator = log_qb.split(
+            split_qbs, new_ids
+        )
 
         self._circuit += split_circ
         m_id = self.add_mmt(len(split_qbs), log_qb_id=log_qb.id)
 
         if split_operator == "X":
-            measured_split_qb = list(set(split_qbs).intersection(set(log_qb.log_x.data_qubits)))[0]
-            new_log_qb1.log_x_corrections.append((m_id, split_qbs.index(measured_split_qb)))
+            measured_split_qb = list(
+                set(split_qbs).intersection(set(log_qb.log_x.data_qubits))
+            )[0]
+            new_log_qb1.log_x_corrections.append(
+                (m_id, split_qbs.index(measured_split_qb))
+            )
         elif split_operator == "Z":
-            measured_split_qb = list(set(split_qbs).intersection(set(log_qb.log_z.data_qubits)))[0]
-            new_log_qb1.log_z_corrections.append((m_id, split_qbs.index(measured_split_qb)))
+            measured_split_qb = list(
+                set(split_qbs).intersection(set(log_qb.log_z.data_qubits))
+            )[0]
+            new_log_qb1.log_z_corrections.append(
+                (m_id, split_qbs.index(measured_split_qb))
+            )
 
         self.remove_logical_qubit(log_qb)
         self.logical_qubits += [new_log_qb1, new_log_qb2]

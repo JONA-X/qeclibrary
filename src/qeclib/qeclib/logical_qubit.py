@@ -1,13 +1,11 @@
 from __future__ import annotations
 from typing import Union, List, Optional, Dict, Tuple
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 
-from .pauli_op import *
-from .stabilizer import *
-from .utilities import *
+from .pauli_op import PauliOp
+from .stabilizer import Stabilizer
 
-import pprint
 import numpy as np
 
 CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
@@ -107,14 +105,12 @@ class LogicalQubit:
         if n - 1 == len(self.stabilizers):
             print("+ The number of stabilizers is correct :)")
         else:
-            print(f"- The number of stabilizers is not correct :(")
+            print("- The number of stabilizers is not correct :(")
             print(
                 f"  There should be {n-1} stabilizers while there are {'only ' if len(self.stabilizers) < n - 1 else ''}{len(self.stabilizers)}"
             )
 
-        list_paulis = [
-            stab.pauli_op for stab in self.stabilizers
-        ]
+        list_paulis = [stab.pauli_op for stab in self.stabilizers]
 
         # Check that stabilizers commute
         list_paulis_to_check = list_paulis
@@ -255,9 +251,7 @@ class LogicalQubit:
                             ],
                         ),
                     )
-            circuit_list += (
-                ("Barrier", []),
-            )
+            circuit_list += (("Barrier", []),)
 
         circuit_list += (
             ("H", [id for id in self._get_ancilla_qubits()]),
@@ -315,11 +309,11 @@ class LogicalQubit:
         pauli_charges = {}
         for qb, charge in pauli_charge_numbers.items():
             charge_list = (charge["X"] % 2, charge["Y"] % 2, charge["Z"] % 2)
-            if charge_list in [(0,0,0), (1,1,1)]:
+            if charge_list in [(0, 0, 0), (1, 1, 1)]:
                 pauli_charges[qb] = "I"
-            elif charge_list in [(1,0,0), (0,1,1)]:
+            elif charge_list in [(1, 0, 0), (0, 1, 1)]:
                 pauli_charges[qb] = "X"
-            elif charge_list in [(0,1,0), (1,0,1)]:
+            elif charge_list in [(0, 1, 0), (1, 0, 1)]:
                 pauli_charges[qb] = "Y"
             else:
                 pauli_charges[qb] = "Z"
@@ -332,25 +326,32 @@ class RotSurfCode(LogicalQubit):
     Defining multiple logical qubit inside the same code patch is not
     supported.
     """
-    d: Optional[int] = None # Code distance along both axes. If d is provided, dx and dz cannot be provided separately
-    dx: Optional[int] = None # Number of rows, minimum length of the X operator
-    dz: Optional[int] = None # Number of columns, minimum length of the Z operator
-        # So left and right boundary are Z boundaries
-        # Top and bottom boundary are X boundaries
+
+    d: Optional[int] = (
+        None  # Code distance along both axes. If d is provided, dx and dz cannot be provided separately
+    )
+    dx: Optional[int] = None  # Number of rows, minimum length of the X operator
+    dz: Optional[int] = None  # Number of columns, minimum length of the Z operator
+    # So left and right boundary are Z boundaries
+    # Top and bottom boundary are X boundaries
 
     def __post_init__(self) -> None:
-        if self.d != None:
-            if self.dx != None or self.dz != None:
-                raise ValueError("If d is provided, dx and dz cannot be provided separately.")
+        if self.d is not None:
+            if self.dx is not None or self.dz is not None:
+                raise ValueError(
+                    "If d is provided, dx and dz cannot be provided separately."
+                )
             self.dx = self.d
             self.dz = self.d
         else:
-            if self.dx == None or self.dz == None:
+            if self.dx is None or self.dz is None:
                 raise ValueError("Please specify either both dx and dz, or only d.")
 
-        if self.stabilizers == None:
+        if self.stabilizers is None:
             stabs = []
-            anc_idx = self.dx * self.dz # Index of the first ancilla qubit. The data qubits are indexed from 0 to dx*dz-1 and the ancilla qubits are indexed from dx*dz to dx*dz+num_anc-1
+            anc_idx = (
+                self.dx * self.dz
+            )  # Index of the first ancilla qubit. The data qubits are indexed from 0 to dx*dz-1 and the ancilla qubits are indexed from dx*dz to dx*dz+num_anc-1
 
             aqb_coords = {}
 
@@ -373,7 +374,7 @@ class RotSurfCode(LogicalQubit):
                                 anc_qubits=[anc_idx],
                             )
                         )
-                        aqb_coords[anc_idx] = (row+1.5, col+1.5)
+                        aqb_coords[anc_idx] = (row + 1.5, col + 1.5)
                         anc_idx += 1
 
             ## ZZ stabilizers
@@ -391,7 +392,7 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (row+1.5, 0.5)
+                    aqb_coords[anc_idx] = (row + 1.5, 0.5)
                     anc_idx += 1
                 else:
                     stabs.append(
@@ -406,7 +407,7 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (row+1.5, self.dz+0.5)
+                    aqb_coords[anc_idx] = (row + 1.5, self.dz + 0.5)
                     anc_idx += 1
 
             ## XXXX stabilizers
@@ -428,7 +429,7 @@ class RotSurfCode(LogicalQubit):
                                 anc_qubits=[anc_idx],
                             )
                         )
-                        aqb_coords[anc_idx] = (row+1.5, col+1.5)
+                        aqb_coords[anc_idx] = (row + 1.5, col + 1.5)
                         anc_idx += 1
 
             ## XX stabilizers
@@ -446,7 +447,7 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (0.5, col+1.5)
+                    aqb_coords[anc_idx] = (0.5, col + 1.5)
                     anc_idx += 1
                 else:
                     stabs.append(
@@ -461,17 +462,20 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (self.dx+0.5, col+1.5)
+                    aqb_coords[anc_idx] = (self.dx + 0.5, col + 1.5)
                     anc_idx += 1
 
             dqb_coords = {}
             for i in range(self.dx * self.dz):
-                dqb_coords[i] = (1+ i // self.dz, 1 + i % self.dz)
+                dqb_coords[i] = (1 + i // self.dz, 1 + i % self.dz)
 
             self.stabilizers = stabs
             self.dqb_coords = dqb_coords
             self.aqb_coords = aqb_coords
-            self.log_x = PauliOp(pauli_string="X" * self.dx, data_qubits=list(np.arange(self.dx) * self.dz))
+            self.log_x = PauliOp(
+                pauli_string="X" * self.dx,
+                data_qubits=list(np.arange(self.dx) * self.dz),
+            )
             self.log_z = PauliOp(pauli_string="Z" * self.dz, data_qubits=range(self.dz))
 
     def transversal_h(self) -> CircuitList:
@@ -480,7 +484,7 @@ class RotSurfCode(LogicalQubit):
             circuit_list.append(["H", qbs])
         return circuit_list
 
-    def get_def_log_op(self, basis:str) -> PauliOp:
+    def get_def_log_op(self, basis: str) -> PauliOp:
         # Idea: Start at one logical corner (i.e. with Pauli charge Y) and move along
         # an X/Z boundary (specified by basis argument) until reaching another logical corner
         pauli_charges = self.get_pauli_charges()
@@ -521,9 +525,21 @@ class RotSurfCode(LogicalQubit):
         neighbours = []
         for qb in self._get_data_qubits():
             if qb != qb_idx:
-                if abs(self.dqb_coords[qb][0] - self.dqb_coords[qb_idx][0]) < threshold and abs(abs(self.dqb_coords[qb][1] - self.dqb_coords[qb_idx][1]) - 1) < threshold:
+                if (
+                    abs(self.dqb_coords[qb][0] - self.dqb_coords[qb_idx][0]) < threshold
+                    and abs(
+                        abs(self.dqb_coords[qb][1] - self.dqb_coords[qb_idx][1]) - 1
+                    )
+                    < threshold
+                ):
                     neighbours.append(qb)
-                elif abs(self.dqb_coords[qb][1] - self.dqb_coords[qb_idx][1]) < threshold and abs(abs(self.dqb_coords[qb][0] - self.dqb_coords[qb_idx][0]) - 1) < threshold:
+                elif (
+                    abs(self.dqb_coords[qb][1] - self.dqb_coords[qb_idx][1]) < threshold
+                    and abs(
+                        abs(self.dqb_coords[qb][0] - self.dqb_coords[qb_idx][0]) - 1
+                    )
+                    < threshold
+                ):
                     neighbours.append(qb)
         return neighbours
 
@@ -563,14 +579,14 @@ class RotSurfCode(LogicalQubit):
             """Returns `X` if the logical X operator is split, `Z` if the logical Z
             operator is split."""
             if len(set(split_qbs).intersection(set(log_x.data_qubits))) == 0:
-                x_op_split = False # The logical x operator is not split
+                x_op_split = False  # The logical x operator is not split
             else:
-                x_op_split = True # The logical x operator is split
+                x_op_split = True  # The logical x operator is split
 
             if len(set(split_qbs).intersection(set(log_z.data_qubits))) == 0:
-                z_op_split = False # The logical z operator is not split
+                z_op_split = False  # The logical z operator is not split
             else:
-                z_op_split = True # The logical z operator is split
+                z_op_split = True  # The logical z operator is split
 
             if x_op_split and z_op_split:
                 raise RuntimeError(
@@ -592,18 +608,27 @@ class RotSurfCode(LogicalQubit):
         split_operator = check_which_log_op_is_split(split_qbs, self.log_x, self.log_z)
 
         # Split up the stabilizers
-        split_direction, splitting_coord = find_split_direction(self.dqb_coords, split_qbs)
+        split_direction, splitting_coord = find_split_direction(
+            self.dqb_coords, split_qbs
+        )
 
-        def find_new_stabs(coordinate_id: int, stabilizers: List[Stabilizer], dqb_coords, check_condition):
+        def find_new_stabs(
+            coordinate_id: int,
+            stabilizers: List[Stabilizer],
+            dqb_coords,
+            check_condition,
+        ):
             new_stabs = []
             for stab in stabilizers:
-                num_dqbs_on_new_patch = 0 # Number of data qubits of this stabilizer which are on the left side of the split
+                num_dqbs_on_new_patch = 0  # Number of data qubits of this stabilizer which are on the left side of the split
                 for dqb in stab.pauli_op.data_qubits:
                     if check_condition(dqb_coords[dqb][coordinate_id]):
                         num_dqbs_on_new_patch += 1
                 if num_dqbs_on_new_patch == 0:
                     new_stabs.append(stab)
-                elif num_dqbs_on_new_patch > 0 and num_dqbs_on_new_patch < len(stab.pauli_op.data_qubits):
+                elif num_dqbs_on_new_patch > 0 and num_dqbs_on_new_patch < len(
+                    stab.pauli_op.data_qubits
+                ):
                     # The stabilizer lies in the boundary region of the split
                     if set(stab.pauli_op.pauli_string) != set(split_operator):
                         continue
@@ -613,11 +638,16 @@ class RotSurfCode(LogicalQubit):
                         new_pauli_str = ""
                         new_data_qbs = []
                         for i, dqb in enumerate(stab.pauli_op.data_qubits):
-                            if abs(dqb_coords[dqb][coordinate_id] - splitting_coord) > threshold:
+                            if (
+                                abs(dqb_coords[dqb][coordinate_id] - splitting_coord)
+                                > threshold
+                            ):
                                 new_pauli_str += stab.pauli_op.pauli_string[i]
                                 new_data_qbs.append(dqb)
                         new_stab = Stabilizer(
-                            pauli_op=PauliOp(pauli_string=new_pauli_str, data_qubits=new_data_qbs),
+                            pauli_op=PauliOp(
+                                pauli_string=new_pauli_str, data_qubits=new_data_qbs
+                            ),
                             anc_qubits=stab.anc_qubits,
                             reset=stab.reset,
                         )
@@ -629,23 +659,32 @@ class RotSurfCode(LogicalQubit):
                 coordinate_id=0,
                 stabilizers=self.stabilizers,
                 dqb_coords=self.dqb_coords,
-                check_condition=lambda x: x > splitting_coord - threshold
-                )
+                check_condition=lambda x: x > splitting_coord - threshold,
+            )
             new_stabs_right = find_new_stabs(
                 coordinate_id=0,
                 stabilizers=self.stabilizers,
                 dqb_coords=self.dqb_coords,
-                check_condition=lambda x: x < splitting_coord + threshold
-                )
+                check_condition=lambda x: x < splitting_coord + threshold,
+            )
 
             def construct_new_log_qb(new_stabs, new_id):
-                dqbs_new = set([dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits])
+                dqbs_new = set(
+                    [dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits]
+                )
                 aqbs_new = set([aqb for stab in new_stabs for aqb in stab.anc_qubits])
                 dqb_coords_new = {qb: self.dqb_coords[qb] for qb in dqbs_new}
                 aqb_coords_new = {qb: self.aqb_coords[qb] for qb in aqbs_new}
-                new_dx = 1 + max([dqb_coords_new[qb][0] for qb in dqbs_new]) - min([dqb_coords_new[qb][0] for qb in dqbs_new])
-                new_dz = 1 + max([dqb_coords_new[qb][1] for qb in dqbs_new]) - min([dqb_coords_new[qb][1] for qb in dqbs_new])
-
+                new_dx = (
+                    1
+                    + max([dqb_coords_new[qb][0] for qb in dqbs_new])
+                    - min([dqb_coords_new[qb][0] for qb in dqbs_new])
+                )
+                new_dz = (
+                    1
+                    + max([dqb_coords_new[qb][1] for qb in dqbs_new])
+                    - min([dqb_coords_new[qb][1] for qb in dqbs_new])
+                )
 
                 new_log_qb = RotSurfCode(
                     new_id,
@@ -657,17 +696,30 @@ class RotSurfCode(LogicalQubit):
                 )
 
                 print(split_operator)
-                if split_operator == "Z": # Z operator is split and X operator is not split
-                    if len(set(dqb_coords_new).intersection(set(self.log_x.data_qubits))) == len(self.log_x.data_qubits):
+                if (
+                    split_operator == "Z"
+                ):  # Z operator is split and X operator is not split
+                    if len(
+                        set(dqb_coords_new).intersection(set(self.log_x.data_qubits))
+                    ) == len(self.log_x.data_qubits):
                         # Logical X is contained on this patch. So just take the old
                         # logical X operator.
                         new_log_qb.log_x = self.log_x
-                    elif len(set(dqb_coords_new).intersection(set(self.log_x.data_qubits))) == 0:
+                    elif (
+                        len(
+                            set(dqb_coords_new).intersection(
+                                set(self.log_x.data_qubits)
+                            )
+                        )
+                        == 0
+                    ):
                         # Logical X is contained on the other patch. So find a new valid
                         # logical X operator.
                         new_log_qb.log_x = new_log_qb.get_def_log_x()
                     else:
-                        raise RuntimeError(f"The logical X operator is not split but it has length {len(self.log_x.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_x.data_qubits)))} of its qubits are contained on the new patch.")
+                        raise RuntimeError(
+                            f"The logical X operator is not split but it has length {len(self.log_x.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_x.data_qubits)))} of its qubits are contained on the new patch."
+                        )
 
                     new_log_z_pauli_str = ""
                     new_log_z_qbs = []
@@ -675,26 +727,52 @@ class RotSurfCode(LogicalQubit):
                         if qb in dqbs_new:
                             new_log_z_pauli_str += self.log_z.pauli_string[i]
                             new_log_z_qbs.append(qb)
-                    new_log_qb.log_z = PauliOp(pauli_string=new_log_z_pauli_str, data_qubits=new_log_z_qbs)
+                    new_log_qb.log_z = PauliOp(
+                        pauli_string=new_log_z_pauli_str, data_qubits=new_log_z_qbs
+                    )
 
-                elif split_operator == "X": # X operator is split and Z operator is not split
-                    if len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits))) == len(self.log_z.data_qubits):
+                elif (
+                    split_operator == "X"
+                ):  # X operator is split and Z operator is not split
+                    if len(
+                        set(dqb_coords_new).intersection(set(self.log_z.data_qubits))
+                    ) == len(self.log_z.data_qubits):
                         # Logical Z is contained on this patch. So just take the old
                         # logical Z operator.
                         new_log_qb.log_z = self.log_z
-                    elif len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits))) == 0:
+                    elif (
+                        len(
+                            set(dqb_coords_new).intersection(
+                                set(self.log_z.data_qubits)
+                            )
+                        )
+                        == 0
+                    ):
                         # Logical Z is contained on the other patch. So find a new valid
                         # logical Z operator.
                         new_log_qb.log_z = new_log_qb.get_def_log_z()
                     else:
-                        raise RuntimeError(f"The logical Z operator is not split but it has length {len(self.log_z.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits)))} of its qubits are contained on the new patch.")
+                        raise RuntimeError(
+                            f"The logical Z operator is not split but it has length {len(self.log_z.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits)))} of its qubits are contained on the new patch."
+                        )
 
-                    if len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits))) == len(self.log_z.data_qubits):
+                    if len(
+                        set(dqb_coords_new).intersection(set(self.log_z.data_qubits))
+                    ) == len(self.log_z.data_qubits):
                         new_log_qb.log_z = self.log_z
-                    elif len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits))) == 0:
+                    elif (
+                        len(
+                            set(dqb_coords_new).intersection(
+                                set(self.log_z.data_qubits)
+                            )
+                        )
+                        == 0
+                    ):
                         new_log_qb.log_z = new_log_qb.get_def_log_z()
                     else:
-                        raise RuntimeError(f"The logical Z operator is not split but it has length {len(self.log_z.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits)))} qubits are contained on the new patch.")
+                        raise RuntimeError(
+                            f"The logical Z operator is not split but it has length {len(self.log_z.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits)))} qubits are contained on the new patch."
+                        )
 
                     new_log_x_pauli_str = ""
                     new_log_x_qbs = []
@@ -702,10 +780,13 @@ class RotSurfCode(LogicalQubit):
                         if qb in dqbs_new:
                             new_log_x_pauli_str += self.log_x.pauli_string[i]
                             new_log_x_qbs.append(qb)
-                    new_log_qb.log_x = PauliOp(pauli_string=new_log_x_pauli_str, data_qubits=new_log_x_qbs)
+                    new_log_qb.log_x = PauliOp(
+                        pauli_string=new_log_x_pauli_str, data_qubits=new_log_x_qbs
+                    )
 
                 return new_log_qb
-        else: # Vertical split
+
+        else:  # Vertical split
             pass
 
         print("Construct first qb")

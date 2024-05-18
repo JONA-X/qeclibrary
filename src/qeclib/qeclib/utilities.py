@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple
+from typing import List
 
-from .stabilizer import *
+from .stabilizer import Stabilizer
 
 
 def number_of_data_qubits_in_stab_list(stabs: List[Stabilizer]) -> int:

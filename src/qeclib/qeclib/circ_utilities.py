@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple
+from typing import Union, List, Dict
 
 import numpy as np
-import stim
 
 from .logical_qubit import LogicalQubit
+import stim
 
 
 def circ_log_QST_results(
@@ -12,7 +12,7 @@ def circ_log_QST_results(
     log_qbs: Union[None, List[LogicalQubit]] = None,
     num_shots: int = 1000,
 ) -> Dict[str, float]:
-    if log_qbs == None:
+    if log_qbs is None:
         log_qbs = circuit.logical_qubits
 
     results_dict = {}
