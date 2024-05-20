@@ -38,6 +38,20 @@ internal_op_to_stim_map: Dict[str, str] = {
     "Barrier": "TICK",
 }
 
+internal_op_to_qasm_str_map: Dict[str, str] = {
+    "R": "R",
+    "X": "X",
+    "Y": "Y",
+    "Z": "Z",
+    "H": "h",
+    "CX": "cnot",
+    "CY": "CY",
+    "CZ": "CZ",
+    "M": "M",
+    "MR": "MR",
+    "Barrier": "TICK",
+}
+
 
 @dataclass()
 class Circuit:
@@ -49,40 +63,82 @@ class Circuit:
     )
     _num_measurements: int = 0
 
-    def print_logical_qubits(self):
-        for qb in self.logical_qubits:
-            print(qb.id)
+    def __deepcopy__(self, memo):
+        new_circ = Circuit(name=self.name)
+        new_circ.logical_qubits = copy.deepcopy(self.logical_qubits)
+        new_circ._circuit = copy.deepcopy(self._circuit)
+        new_circ._m_list = copy.deepcopy(self._m_list)
+        new_circ._num_measurements = copy.deepcopy(self._num_measurements)
+        return new_circ
 
-    def is_log_qb_id_contained(self, id: str):
+    def print_logical_qubits(self, only_active: Optional[bool] = True):
         for qb in self.logical_qubits:
-            if id == qb.id:
-                return True
-        return False
+            if not only_active or qb.exists:
+                print(qb.id)
+
+    def exists_log_qb(self, id: str) -> int:
+        # Check if activate qubit with the same id exists
+        for qb in self.logical_qubits:
+            if id == qb.id and qb.exists is True:
+                return 1
+        # Otherwise check if there is an inactive qubit with the same id
+        for qb in self.logical_qubits:
+            if qb.exists is False and id == qb.id:
+                return 2
+        return 0
+
+    def get_log_qb(self, id: str) -> LogicalQubit:
+        for qb in self.logical_qubits:
+            if id == qb.id and qb.exists is True:
+                return qb
+
+        # Didn't find the logical qubit
+        return None
+
+    def exists_log_qb_w_exception(self, id: str) -> int:
+        exists = self.exists_log_qb(id)
+        if exists == 1:
+            raise ValueError("Logical qubit ID already exists on the processor")
+        elif exists == 2:
+            raise Warning("Logical qubit ID does not exist among the active qubits but there has previously been a logical qubit with the same ID.")
+        return exists
 
     def add_logical_qubit(self, logical_qubit: LogicalQubit):
-        if self.is_log_qb_id_contained(logical_qubit.id):
-            raise ValueError("Logical qubit ID already exists on the processor")
+        self.exists_log_qb_w_exception(logical_qubit.id)
 
         self.logical_qubits.append(logical_qubit)
 
-    def remove_logical_qubit(self, logical_qubit: LogicalQubit) -> bool:
-        if not self.is_log_qb_id_contained(logical_qubit.id):
+    def remove_logical_qubit(self, logical_qubit_id: str) -> bool:
+        if self.exists_log_qb(logical_qubit_id) == 0:
             raise ValueError(
                 "Logical qubit does not exist on the processor and cannot be deleted."
             )
+        elif self.exists_log_qb(logical_qubit_id) == 2:
+            raise ValueError(
+                f"There has been a logical qubit with name {logical_qubit_id} once but it has already been deleted. Cannot delete it again."
+            )
 
         for i, qb in enumerate(self.logical_qubits):
-            if qb.id == logical_qubit.id:
+            if qb.id == logical_qubit_id:
                 self.logical_qubits[i].exists = (
                     False  # Mark the original logical qubit as non-existent
                 )
-                del self.logical_qubits[i]
                 return True
 
         return False
 
-    def _log_qb_valid_check(self, log_qb: LogicalQubit) -> True:
+    def _log_qb_valid_check(self, log_qb: LogicalQubit) -> bool:
         if log_qb not in self.logical_qubits:
+            raise ValueError("Logical qubit does not exist in this circuit.")
+        if log_qb.exists is False:
+            raise ValueError(
+                "Logical qubit does not exist anymore due to a previous merge or split."
+            )
+        return True
+
+    def _log_qb_id_valid_check(self, log_qb_id: str) -> bool:
+        log_qb = self.get_log_qb(log_qb_id)
+        if log_qb is None:
             raise ValueError("Logical qubit does not exist in this circuit.")
         if log_qb.exists is False:
             raise ValueError(
@@ -154,6 +210,29 @@ class Circuit:
             stim_circ += "\n"
         return stim_circ
 
+    def convert_to_qasm(self) -> str:
+        qasm_str = "OPENQASM 3;"
+        qasm_str += "include \"stdgates.inc\";"
+
+        # Define coordinates of logical qubits
+        for log_qb in self.logical_qubits:
+            for id, coords in log_qb.dqb_coords.items():
+                qasm_str += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {id}\n"
+
+            for id, coords in log_qb.aqb_coords.items():
+                qasm_str += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {id}\n"
+
+        # Operations of the circuit
+        for op in self._circuit:
+            qasm_str += internal_op_to_qasm_str_map[op[0]]
+            if isinstance(op[1], int):
+                qasm_str += f" {op[1]}"
+            else:
+                for qb in op[1]:
+                    qasm_str += f" {qb}"
+            qasm_str += "\n"
+        return qasm_str
+
     def add_def_syndrome_extraction_circuit(
         self, log_qbs: List[LogicalQubit] = []
     ) -> None:
@@ -182,8 +261,11 @@ class Circuit:
 
         return uuids
 
-    def m_log(self, log_qb: LogicalQubit, basis: str, label: str = "") -> str:
-        self._log_qb_valid_check(log_qb) # Raise exception if the provided logical qubit is not valid
+    def m_log(self, log_qb_id: str, basis: str, label: str = "") -> str:
+        if not isinstance(log_qb_id, str):
+            raise ValueError("Logical qubit ID must be a string")
+        self._log_qb_id_valid_check(log_qb_id) # Raise exception if the provided logical qubit id is not valid
+        log_qb = self.get_log_qb(log_qb_id)
 
         if basis == "X":
             m_circ = log_qb.m_log_x()
@@ -214,26 +296,28 @@ class Circuit:
         )
         return m_id
 
-    def m_log_x(self, log_qb: LogicalQubit, label: str = "") -> str:
-        return self.m_log(log_qb, "X", label)
+    def m_log_x(self, log_qb_id: str, label: str = "") -> str:
+        return self.m_log(log_qb_id, "X", label)
 
-    def m_log_y(self, log_qb: LogicalQubit, label: str = "") -> str:
-        return self.m_log(log_qb, "Y", label)
+    def m_log_y(self, log_qb_id: str, label: str = "") -> str:
+        return self.m_log(log_qb_id, "Y", label)
 
-    def m_log_z(self, log_qb: LogicalQubit, label: str = "") -> str:
-        return self.m_log(log_qb, "Z", label)
+    def m_log_z(self, log_qb_id: str, label: str = "") -> str:
+        return self.m_log(log_qb_id, "Z", label)
 
-    def log_QST(self, log_qbs: List[LogicalQubit]) -> List[Tuple[str, Circuit]]:
+    def log_QST(self, log_qbs: List[str], bases: Optional[List[str]] = ["X", "Y", "Z"]) -> List[Tuple[str, Circuit]]:
+        if log_qbs is None:
+            log_qbs = [c.id for c in self.logical_qubits if c.exists is True]
+
         if not isinstance(log_qbs, list):
             log_qbs = [log_qbs]
 
-        # bases = list(itertools.product(['X', 'Y', 'Z'], repeat=len(log_qbs)))
-        bases = list(itertools.product(["X", "Z"], repeat=len(log_qbs)))
+        bases = list(itertools.product(bases, repeat=len(log_qbs)))
         list_circuits = []
         for basis in bases:
             new_circ = copy.deepcopy(self)
             for i, log_qb in enumerate(log_qbs):
-                new_circ.m_log(log_qb, basis[i], f"QST_{log_qb.id}")
+                new_circ.m_log(log_qb, basis[i], f"QST_{log_qb}")
             list_circuits.append(("".join(basis), new_circ))
         return list_circuits
 
@@ -251,17 +335,21 @@ class Circuit:
             res[uuid] = measurements[mmt[0] : mmt[0] + mmt[1]]
         return res
 
-    def get_log_dqb_readout(self, measurements, m_id, log_qb: LogicalQubit) -> int:
+    def get_log_dqb_readout(self, measurements, m_id, qb_id: str) -> int:
         val = np.sum(self.dict_m_uuids_to_res(measurements)[m_id]) % 2
-        mmt_tuple = log_qb.logical_readouts[m_id]
+        mmt_tuple = self.get_log_qb(qb_id).logical_readouts[m_id]
         for corr in mmt_tuple[1]:
             val += self.dict_m_uuids_to_res(measurements)[corr[0]][corr[1]]
         return val % 2
 
     def split(
-        self, log_qb: LogicalQubit, split_qbs: List[int], new_ids: Tuple[str, str]
+        self,
+        logical_qubit_id: str,
+        split_qbs: List[int],
+        new_ids: Tuple[str, str],
     ) -> Tuple[str, LogicalQubit, LogicalQubit]:
-        self._log_qb_valid_check(log_qb)
+        log_qb = self.get_log_qb(logical_qubit_id)
+        self._log_qb_id_valid_check(logical_qubit_id)
 
         split_circ, new_log_qb1, new_log_qb2, split_operator = log_qb.split(
             split_qbs, new_ids
@@ -277,6 +365,7 @@ class Circuit:
             new_log_qb1.log_x_corrections.append(
                 (m_id, split_qbs.index(measured_split_qb))
             )
+            # TODO: Add the corrections for Z_L
         elif split_operator == "Z":
             measured_split_qb = list(
                 set(split_qbs).intersection(set(log_qb.log_z.data_qubits))
@@ -284,8 +373,9 @@ class Circuit:
             new_log_qb1.log_z_corrections.append(
                 (m_id, split_qbs.index(measured_split_qb))
             )
+            # TODO: Add the corrections for X_L
 
-        self.remove_logical_qubit(log_qb)
+        self.remove_logical_qubit(logical_qubit_id)
         self.logical_qubits += [new_log_qb1, new_log_qb2]
 
         return m_id, new_log_qb1, new_log_qb2
