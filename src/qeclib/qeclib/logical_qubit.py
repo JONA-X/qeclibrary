@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple
+from typing import Union, List, Optional, Dict, Tuple, Literal
+from abc import ABC, abstractmethod
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
@@ -12,7 +13,7 @@ CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
 
 
 @dataclass()
-class LogicalQubit:
+class LogicalQubit(ABC):
     """Class representing one logical qubit on a code patch.
     Defining multiple logical qubits inside the same code patch is not
     supported.
@@ -179,13 +180,13 @@ class LogicalQubit:
 
         # TODO: Generalize for other cases
         if state in [0, "0"]:
-            circ = [["R", self._get_data_qubits()]]
-            circ += [["Barrier", []]]
+            circ = [("R", self._get_data_qubits())]
+            circ += [("Barrier", [])]
             return circ
         elif state in [1, "1"]:
-            circ = [["R", self._get_data_qubits()]]
+            circ = [("R", self._get_data_qubits())]
             circ += self.x()
-            circ += [["Barrier", []]]
+            circ += [("Barrier", [])]
             return circ
         else:
             raise ValueError("Currently it is only supported to start in |0> or |1>.")
@@ -318,6 +319,14 @@ class LogicalQubit:
             else:
                 pauli_charges[qb] = "Z"
         return pauli_charges
+
+    @abstractmethod
+    def split(
+            self,
+            split_qbs: List[int],
+            new_ids: Tuple[str, str]
+            ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
+        pass
 
 
 @dataclass()
@@ -478,6 +487,9 @@ class RotSurfCode(LogicalQubit):
             )
             self.log_z = PauliOp(pauli_string="Z" * self.dz, data_qubits=range(self.dz))
 
+    def _get_qb_id_from_coords(self, row: int, col: int) -> int:
+        return row * self.dz + col
+
     def transversal_h(self) -> CircuitList:
         circuit_list = []
         for qbs in self._get_data_qubits():
@@ -496,9 +508,7 @@ class RotSurfCode(LogicalQubit):
         log_op_dqbs = [start_qb]
         completed = False
         while not completed:
-            print(current_qb)
             for next_qb in self.get_neighbour_qbs(current_qb):
-                print(f"--{next_qb} {pauli_charges[next_qb]}")
                 if next_qb in log_op_dqbs:
                     continue
 
@@ -543,7 +553,11 @@ class RotSurfCode(LogicalQubit):
                     neighbours.append(qb)
         return neighbours
 
-    def split(self, split_qbs: List[int], new_ids: Tuple[str, str]):
+    def split(
+            self,
+            split_qbs: List[int],
+            new_ids: Tuple[str, str]
+            ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
         threshold = 1e-3
 
         def find_split_direction(dqb_coords, split_qbs) -> Tuple[str, float]:
@@ -805,3 +819,35 @@ class RotSurfCode(LogicalQubit):
         ]
 
         return split_qbs_mmt_circ, new_qb1, new_qb2, split_operator
+
+    def shrink(self, num_rows: int, direction: Literal["t", "b", "l", "r"]) -> CircuitList:
+        """_summary_
+
+        Parameters
+        ----------
+        num_rows : int
+            _description_
+        direction : Literal["t", "b", "l", "r"]
+            Direction from where rows/columns should be deleted.
+
+        Returns
+        -------
+        CircuitList
+            _description_
+        """
+        circuit_list = []
+        if direction == "r":
+            if num_rows > self.dz - 1:
+                raise ValueError(
+                    f"Cannot remove {num_rows} columns since there are only {self.dz} columns. We need at least one column remaining after shrinking."
+                )
+
+            qubits_to_measure = []
+
+
+        elif direction in ["t", "b", "l"]:
+            raise NotImplementedError("Shrinking in this direction is not yet supported.")
+        else:
+            raise ValueError("Invalid direction. Must be in ['t', 'b', 'l', 'r']")
+
+        return circuit_list

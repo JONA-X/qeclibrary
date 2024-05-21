@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple
+from typing import Union, List, Optional, Dict, Tuple, Literal
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 import uuid
@@ -8,6 +8,7 @@ import copy
 import numpy as np
 
 from .logical_qubit import LogicalQubit
+from .noise_models import NoiseModel
 
 CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
 
@@ -36,6 +37,8 @@ internal_op_to_stim_map: Dict[str, str] = {
     "M": "M",
     "MR": "MR",
     "Barrier": "TICK",
+    "DEPOLARIZE1": "DEPOLARIZE1",
+    "DEPOLARIZE2": "DEPOLARIZE2",
 }
 
 internal_op_to_qasm_str_map: Dict[str, str] = {
@@ -60,7 +63,10 @@ class Circuit:
     _circuit: Optional[CircuitList] = Field(default_factory=lambda: [])
     _m_list: List[Tuple[int, int, str, str, Union[None, str]]] = Field(
         default_factory=lambda: []
-    )
+    ) # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
+    _m_list: List[Tuple[int, int, str, str, Union[None, str]]] = Field(
+        default_factory=lambda: []
+    ) # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
     _num_measurements: int = 0
 
     def __deepcopy__(self, memo):
@@ -87,26 +93,38 @@ class Circuit:
                 return 2
         return 0
 
-    def get_log_qb(self, id: str) -> LogicalQubit:
+    def get_log_qb(self, id: str, raise_exceptions: bool = True, raise_warnings: bool = False) -> LogicalQubit:
+        if not isinstance(id, str):
+            raise ValueError("Logical qubit ID must be a string")
+
+        log_qb = None
+        found_qb_but_inactive = False
         for qb in self.logical_qubits:
-            if id == qb.id and qb.exists is True:
-                return qb
+            if id == qb.id:
+                log_qb = qb
+                if qb.exists is True:
+                    found_qb_but_inactive = False # Need to set back to False in case before we found an inactive qubit with the same id already
+                    break
+                else:
+                    found_qb_but_inactive = True
 
-        # Didn't find the logical qubit
-        return None
+        if log_qb is None:
+            if raise_exceptions:
+                raise ValueError("Logical qubit with the given ID does not exist in this circuit.")
+            if raise_warnings:
+                raise Warning("Logical qubit with the given ID does not exist in this circuit.")
+        if found_qb_but_inactive:
+            if raise_exceptions or raise_warnings:
+                raise Warning("Logical qubit ID does not exist among the active qubits but there has previously been a logical qubit with the same ID.")
 
-    def exists_log_qb_w_exception(self, id: str) -> int:
-        exists = self.exists_log_qb(id)
-        if exists == 1:
-            raise ValueError("Logical qubit ID already exists on the processor")
-        elif exists == 2:
-            raise Warning("Logical qubit ID does not exist among the active qubits but there has previously been a logical qubit with the same ID.")
-        return exists
+        return log_qb
 
     def add_logical_qubit(self, logical_qubit: LogicalQubit):
-        self.exists_log_qb_w_exception(logical_qubit.id)
-
-        self.logical_qubits.append(logical_qubit)
+        log_qb = self.get_log_qb(logical_qubit.id, raise_exceptions=False, raise_warnings=False)
+        if log_qb is None or log_qb.exists is False:
+            self.logical_qubits.append(logical_qubit)
+        else:
+            raise ValueError("Logical qubit already exists.")
 
     def remove_logical_qubit(self, logical_qubit_id: str) -> bool:
         if self.exists_log_qb(logical_qubit_id) == 0:
@@ -127,20 +145,14 @@ class Circuit:
 
         return False
 
-    def _log_qb_valid_check(self, log_qb: LogicalQubit) -> bool:
-        if log_qb not in self.logical_qubits:
-            raise ValueError("Logical qubit does not exist in this circuit.")
-        if log_qb.exists is False:
-            raise ValueError(
-                "Logical qubit does not exist anymore due to a previous merge or split."
-            )
-        return True
-
     def _log_qb_id_valid_check(self, log_qb_id: str) -> bool:
-        log_qb = self.get_log_qb(log_qb_id)
-        if log_qb is None:
+        if not isinstance(log_qb_id, str):
+            raise ValueError("Logical qubit ID must be a string")
+
+        log_qb = self.exists_log_qb(log_qb_id)
+        if log_qb == 0:
             raise ValueError("Logical qubit does not exist in this circuit.")
-        if log_qb.exists is False:
+        if log_qb == 2:
             raise ValueError(
                 "Logical qubit does not exist anymore due to a previous merge or split."
             )
@@ -159,21 +171,21 @@ class Circuit:
         self._num_measurements += length
         return m_id
 
-    def x(self, log_qb: LogicalQubit) -> None:
-        if self._log_qb_valid_check(log_qb):
-            self._circuit += log_qb.x()
+    def x(self, log_qb_id: str) -> None:
+        if self._log_qb_id_valid_check(log_qb_id):
+            self._circuit += self.get_log_qb(log_qb_id).x()
 
-    def y(self, log_qb: LogicalQubit) -> None:
-        if self._log_qb_valid_check(log_qb):
-            self._circuit += log_qb.y()
+    def y(self, log_qb_id: str) -> None:
+        if self._log_qb_id_valid_check(log_qb_id):
+            self._circuit += self.get_log_qb(log_qb_id).y()
 
-    def z(self, log_qb: LogicalQubit) -> None:
-        if self._log_qb_valid_check(log_qb):
-            self._circuit += log_qb.z()
+    def z(self, log_qb_id: str) -> None:
+        if self._log_qb_id_valid_check(log_qb_id):
+            self._circuit += self.get_log_qb(log_qb_id).z()
 
-    def h_trans_raw(self, log_qb: LogicalQubit) -> None:
-        if self._log_qb_valid_check(log_qb):
-            self._circuit += log_qb.h_trans_raw()
+    def h_trans_raw(self, log_qb_id: str) -> None:
+        if self._log_qb_id_valid_check(log_qb_id):
+            self._circuit += self.get_log_qb(log_qb_id).h_trans_raw()
 
     def init(self, log_qb: LogicalQubit, state: Union[str, int]) -> None:
         """
@@ -186,10 +198,10 @@ class Circuit:
         Returns
         -------
         """
-        if self._log_qb_valid_check(log_qb):
+        if self._log_qb_id_valid_check(log_qb.id):
             self._circuit += log_qb.init(state)
 
-    def convert_to_stim(self) -> str:
+    def convert_to_stim(self, noise_model: NoiseModel = None) -> str:
         stim_circ = ""
         # Define coordinates of logical qubits
         for log_qb in self.logical_qubits:
@@ -199,9 +211,16 @@ class Circuit:
             for id, coords in log_qb.aqb_coords.items():
                 stim_circ += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {id}\n"
 
+        if noise_model is None:
+            operation_list = self._circuit
+        else:
+            operation_list = noise_model.add_errors_to_circuit(self._circuit)
+
         # Operations of the circuit
-        for op in self._circuit:
+        for op in operation_list:
             stim_circ += internal_op_to_stim_map[op[0]]
+            if op[0] in ["DEPOLARIZE1", "DEPOLARIZE2"]:
+                stim_circ += f"({op[2]})"
             if isinstance(op[1], int):
                 stim_circ += f" {op[1]}"
             else:
@@ -248,18 +267,35 @@ class Circuit:
         return uuids
 
     def add_par_def_syndrome_extraction_circuit(
-        self, log_qbs: List[LogicalQubit] = []
-    ) -> None:
-        if len(log_qbs) == 0:
-            log_qbs = self.logical_qubits
+        self,
+        log_qb_id: str,
+        label: Optional[str] = None,
+    ) -> List[str]:
+        self._log_qb_id_valid_check(log_qb_id) # Raise exception if the provided logical qubit id is not valid
+        log_qb = self.get_log_qb(log_qb_id)
 
         uuids = []
-        for log_qb in log_qbs:
-            self._circuit += log_qb.get_par_def_syndrome_extraction_circuit()
-            m_id = self.add_mmt(len(log_qb.stabilizers), "", log_qb.id)
+        self._circuit += log_qb.get_par_def_syndrome_extraction_circuit()
+        for i, stab in enumerate(log_qb.stabilizers):
+            if label is not None:
+                m_label = label + str(stab.pauli_op)
+            else:
+                m_label = None # Pass None to the function, so that it will use the uuid as a label
+            m_id = self.add_mmt(1, m_label, log_qb.id)
             uuids.append(m_id)
 
         return uuids
+
+    def add_par_def_syndrome_extraction_circuit_all_log_qbs(self, round: int = None) -> List[str]:
+        all_uuids = []
+        for log_qb in self.logical_qubits:
+            if round is not None:
+                label = f"QEC_r{round}_" + log_qb.id
+            else:
+                label = None
+            uuids = self.add_par_def_syndrome_extraction_circuit(log_qb.id, label)
+            all_uuids += uuids
+        return all_uuids
 
     def m_log(self, log_qb_id: str, basis: str, label: str = "") -> str:
         if not isinstance(log_qb_id, str):
@@ -379,3 +415,15 @@ class Circuit:
         self.logical_qubits += [new_log_qb1, new_log_qb2]
 
         return m_id, new_log_qb1, new_log_qb2
+
+    def shrink(
+            self,
+            logical_qubit_id: str,
+            num_rows: int,
+            direction: Literal["t", "b", "l", "r"],
+    ):
+        self._log_qb_id_valid_check(logical_qubit_id)
+        log_qb = self.get_log_qb(logical_qubit_id)
+
+        shrink_circ = log_qb.shrink(num_rows, direction)
+        self._circuit += shrink_circ
