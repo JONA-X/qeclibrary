@@ -1,3 +1,4 @@
+from .noise_models import *
 from .logical_qubit import *
 from .circuit import *
 from .pauli_op import *
