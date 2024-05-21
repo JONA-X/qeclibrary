@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Union, List, Optional, Dict, Tuple, Literal
+from abc import ABC, abstractmethod
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 import uuid
@@ -7,7 +8,7 @@ import itertools
 import copy
 import numpy as np
 
-from .logical_qubit import LogicalQubit
+from .logical_qubit import LogicalQubit, RotSurfCode
 from .noise_models import NoiseModel
 
 CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
@@ -57,25 +58,21 @@ internal_op_to_qasm_str_map: Dict[str, str] = {
 
 
 @dataclass()
-class Circuit:
+class Circuit(ABC):
     name: str
     logical_qubits: List[LogicalQubit] = Field(init=False, default_factory=lambda: [])
     _circuit: Optional[CircuitList] = Field(default_factory=lambda: [])
     _m_list: List[Tuple[int, int, str, str, Union[None, str]]] = Field(
         default_factory=lambda: []
     ) # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
-    _m_list: List[Tuple[int, int, str, str, Union[None, str]]] = Field(
-        default_factory=lambda: []
-    ) # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
     _num_measurements: int = 0
+    dqb_coords: Optional[Dict[int, Tuple[float, float]]] = Field(
+        default_factory=lambda: {}
+    )  # Map from data qubit indices to coordinates
 
+    @abstractmethod
     def __deepcopy__(self, memo):
-        new_circ = Circuit(name=self.name)
-        new_circ.logical_qubits = copy.deepcopy(self.logical_qubits)
-        new_circ._circuit = copy.deepcopy(self._circuit)
-        new_circ._m_list = copy.deepcopy(self._m_list)
-        new_circ._num_measurements = copy.deepcopy(self._num_measurements)
-        return new_circ
+        pass
 
     def print_logical_qubits(self, only_active: Optional[bool] = True):
         for qb in self.logical_qubits:
@@ -119,12 +116,9 @@ class Circuit:
 
         return log_qb
 
-    def add_logical_qubit(self, logical_qubit: LogicalQubit):
-        log_qb = self.get_log_qb(logical_qubit.id, raise_exceptions=False, raise_warnings=False)
-        if log_qb is None or log_qb.exists is False:
-            self.logical_qubits.append(logical_qubit)
-        else:
-            raise ValueError("Logical qubit already exists.")
+    @abstractmethod
+    def add_logical_qubit(self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (0, 0)):
+        pass
 
     def remove_logical_qubit(self, logical_qubit_id: str) -> bool:
         if self.exists_log_qb(logical_qubit_id) == 0:
@@ -165,7 +159,7 @@ class Circuit:
 
         for mmt in self._m_list:
             if mmt[2] == label:
-                raise ValueError("Measurement label already exists in the circuit.")
+                raise ValueError(f"Measurement label {label} exists in the circuit.")
 
         self._m_list += [(self._num_measurements, length, label, m_id, log_qb_id)]
         self._num_measurements += length
@@ -187,7 +181,7 @@ class Circuit:
         if self._log_qb_id_valid_check(log_qb_id):
             self._circuit += self.get_log_qb(log_qb_id).h_trans_raw()
 
-    def init(self, log_qb: LogicalQubit, state: Union[str, int]) -> None:
+    def init(self, log_qb_id: str, state: Union[str, int]) -> None:
         """
 
         Parameters
@@ -198,8 +192,8 @@ class Circuit:
         Returns
         -------
         """
-        if self._log_qb_id_valid_check(log_qb.id):
-            self._circuit += log_qb.init(state)
+        if self._log_qb_id_valid_check(log_qb_id):
+            self._circuit += self.get_log_qb(log_qb_id).init(state)
 
     def convert_to_stim(self, noise_model: NoiseModel = None) -> str:
         stim_circ = ""
@@ -351,10 +345,11 @@ class Circuit:
         bases = list(itertools.product(bases, repeat=len(log_qbs)))
         list_circuits = []
         for basis in bases:
+            basis_str = "".join(basis)
             new_circ = copy.deepcopy(self)
             for i, log_qb in enumerate(log_qbs):
-                new_circ.m_log(log_qb, basis[i], f"QST_{log_qb}")
-            list_circuits.append(("".join(basis), new_circ))
+                new_circ.m_log(log_qb, basis[i], f"QST_{log_qb}_{basis_str}")
+            list_circuits.append((basis_str, new_circ))
         return list_circuits
 
     def dict_m_labels_to_res(self, measurements):
@@ -427,3 +422,79 @@ class Circuit:
 
         shrink_circ = log_qb.shrink(num_rows, direction)
         self._circuit += shrink_circ
+
+@dataclass
+class SquareLattice(Circuit):
+    rows: int = None
+    cols: int = None
+
+    def __init__(self, rows:int=None, cols:int=None):
+        if rows is None:
+            raise ValueError("Number of rows must be provided.")
+        else:
+            self.rows = rows
+
+        if cols is None:
+            raise ValueError("Number of columns must be provided.")
+        else:
+            self.cols = cols
+
+    def __post_init__(self):
+        self.dqb_coords = {
+            i: (1 + i // self.cols, 1 + i % self.cols) for i in range(self.rows * self.cols)
+        }
+
+    def __deepcopy__(self, memo):
+        new_circ = SquareLattice(name=self.name, rows=self.rows, cols=self.cols)
+        log_qbs = copy.deepcopy(self.logical_qubits)
+        for log_qb in log_qbs:
+            log_qb.circ = new_circ
+        new_circ.logical_qubits = log_qbs
+        new_circ._circuit = self._circuit
+        new_circ._m_list = self._m_list
+        new_circ._num_measurements = self._num_measurements
+        new_circ.dqb_coords = self.dqb_coords
+        return new_circ
+
+    def get_neighbour_qbs(self, qb_idx: int) -> List[int]:
+        neighbours = []
+
+        for r, c in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            if 0 <= qb_idx % self.cols + c < self.cols and 0 <= qb_idx // self.cols + r < self.rows:
+                neighbours.append(qb_idx + r * self.cols + c)
+
+        return neighbours
+
+    def add_logical_qubit(self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (1, 1)):
+        if isinstance(logical_qubit, RotSurfCode):
+            if any([not isinstance(start_pos[i], int) for i in range(2)]):
+                raise ValueError("Start position must be a tuple of integers.")
+            if any([start_pos[i] < 1 for i in range(2)]):
+                raise ValueError("Start position coordinates must be larger or equal to 1.")
+            if start_pos[1] > self.cols:
+                raise ValueError("Start position column cannot be larger than the number of columns.")
+            if start_pos[0] > self.rows:
+                raise ValueError("Start position row cannot be larger than the number of rows.")
+            id_map = {}
+            for r in range(logical_qubit.dx):
+                for c in range(logical_qubit.dz):
+                    rnew = r + start_pos[0] - 1
+                    cnew = c + start_pos[1] - 1
+                    id_map[r*logical_qubit.dz + c] = rnew * self.cols + cnew
+
+            log_qb = self.get_log_qb(logical_qubit.id, raise_exceptions=False, raise_warnings=False)
+            if log_qb is None or log_qb.exists is False:
+                self.logical_qubits.append(logical_qubit)
+                logical_qubit.circ = self
+                for stab in logical_qubit.stabilizers:
+                    for i, qb in enumerate(stab.pauli_op.data_qubits):
+                        stab.pauli_op.data_qubits[i] = id_map[qb]
+
+                for i, qb in enumerate(logical_qubit.log_x.data_qubits):
+                    logical_qubit.log_x.data_qubits[i] = id_map[qb]
+                for i, qb in enumerate(logical_qubit.log_z.data_qubits):
+                    logical_qubit.log_z.data_qubits[i] = id_map[qb]
+            else:
+                raise ValueError("Logical qubit already exists.")
+        else:
+            raise NotImplementedError("Only RotSurfCode logical qubits are supported on the square lattice for now.")

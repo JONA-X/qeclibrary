@@ -34,3 +34,26 @@ class QECPlot:
                 "autorange": True,  # Otherwise y axis would be reversed
             },
         )
+
+    def add_dqubits(self, dqb_coords, color: str = "gray"):
+        for qb_id, qb in dqb_coords.items():
+            self.fig.add_trace(
+                go.Scatter(
+                    x=[qb[1]],
+                    y=[qb[0]],
+                    mode="markers+text",
+                    marker=dict(
+                                size=10,
+                                color=color,
+                                line=dict(
+                                    width=1,
+                                    color="darkred",
+                                ),
+                            ),
+                    text=qb_id,
+                    textposition="middle center",
+                    hoverinfo="text",
+                    legendgroup="chip_grid",
+                    showlegend=False,
+                )
+            )

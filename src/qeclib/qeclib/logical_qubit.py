@@ -44,6 +44,7 @@ class LogicalQubit(ABC):
         default_factory=lambda: {},
         init=False,
     )
+    circ: object = None
 
     def __post_init__(self) -> None:
         self._check_correctness()
@@ -147,6 +148,20 @@ class LogicalQubit(ABC):
             print("+ The logical X and Z operators anticommute :)")
         else:
             print("- The logical X and Z operators do not anticommute :(")
+
+    def get_neighbour_qbs(self, qb: int) -> List[int]:
+        dqbs = self._get_data_qubits()
+        print(self.circ)
+        neighbors = [qb for qb in self.circ.get_neighbour_qbs(qb) if qb in dqbs]
+        return neighbors
+
+    def get_dqb_coords(self) -> Dict[int, Tuple[float, float]]:
+        dqb_coords = {}
+        dqbs = self._get_data_qubits()
+        for i, coord in self.circ.dqb_coords.items():
+            if i in dqbs:
+                dqb_coords[i] = coord
+        return dqb_coords
 
     def x(self) -> CircuitList:
         circuit_list = []
@@ -344,6 +359,25 @@ class RotSurfCode(LogicalQubit):
     # So left and right boundary are Z boundaries
     # Top and bottom boundary are X boundaries
 
+    def __deepcopy__(self, memo):
+        new_qb = RotSurfCode(
+            id=self.id,
+            stabilizers=self.stabilizers,
+            log_x=self.log_x,
+            log_z=self.log_z,
+            exists=self.exists,
+            dqb_coords=self.dqb_coords,
+            aqb_coords=self.aqb_coords,
+            log_x_corrections=self.log_x_corrections,
+            log_z_corrections=self.log_z_corrections,
+            logical_readouts=self.logical_readouts,
+            circ=None,
+            d=self.d,
+            dx=self.dx,
+            dz=self.dz,
+        )
+        return new_qb
+
     def __post_init__(self) -> None:
         if self.d is not None:
             if self.dx is not None or self.dz is not None:
@@ -530,29 +564,6 @@ class RotSurfCode(LogicalQubit):
     def get_def_log_z(self) -> PauliOp:
         return self.get_def_log_op("Z")
 
-    def get_neighbour_qbs(self, qb_idx: int) -> List[int]:
-        threshold = 1e-3
-        neighbours = []
-        for qb in self._get_data_qubits():
-            if qb != qb_idx:
-                if (
-                    abs(self.dqb_coords[qb][0] - self.dqb_coords[qb_idx][0]) < threshold
-                    and abs(
-                        abs(self.dqb_coords[qb][1] - self.dqb_coords[qb_idx][1]) - 1
-                    )
-                    < threshold
-                ):
-                    neighbours.append(qb)
-                elif (
-                    abs(self.dqb_coords[qb][1] - self.dqb_coords[qb_idx][1]) < threshold
-                    and abs(
-                        abs(self.dqb_coords[qb][0] - self.dqb_coords[qb_idx][0]) - 1
-                    )
-                    < threshold
-                ):
-                    neighbours.append(qb)
-        return neighbours
-
     def split(
             self,
             split_qbs: List[int],
@@ -567,9 +578,9 @@ class RotSurfCode(LogicalQubit):
             split_direction_hor = True
             split_direction_vert = True
             for qb in split_qbs:
-                if self.dqb_coords[qb][0] != self.dqb_coords[split_qbs[0]][0]:
+                if dqb_coords[qb][0] != dqb_coords[split_qbs[0]][0]:
                     split_direction_hor = False
-                if self.dqb_coords[qb][1] != self.dqb_coords[split_qbs[0]][1]:
+                if dqb_coords[qb][1] != dqb_coords[split_qbs[0]][1]:
                     split_direction_vert = False
 
             if split_direction_hor and split_direction_vert:
@@ -582,10 +593,10 @@ class RotSurfCode(LogicalQubit):
                 )
             elif split_direction_hor:
                 split_direction = "horizontal"
-                splitting_coord = self.dqb_coords[split_qbs[0]][0]
+                splitting_coord = dqb_coords[split_qbs[0]][0]
             else:
                 split_direction = "vertical"
-                splitting_coord = self.dqb_coords[split_qbs[0]][1]
+                splitting_coord = dqb_coords[split_qbs[0]][1]
 
             return split_direction, splitting_coord
 
@@ -623,7 +634,7 @@ class RotSurfCode(LogicalQubit):
 
         # Split up the stabilizers
         split_direction, splitting_coord = find_split_direction(
-            self.dqb_coords, split_qbs
+            self.get_dqb_coords(), split_qbs
         )
 
         def find_new_stabs(
@@ -672,13 +683,13 @@ class RotSurfCode(LogicalQubit):
             new_stabs_left = find_new_stabs(
                 coordinate_id=0,
                 stabilizers=self.stabilizers,
-                dqb_coords=self.dqb_coords,
+                dqb_coords=self.get_dqb_coords(),
                 check_condition=lambda x: x > splitting_coord - threshold,
             )
             new_stabs_right = find_new_stabs(
                 coordinate_id=0,
                 stabilizers=self.stabilizers,
-                dqb_coords=self.dqb_coords,
+                dqb_coords=self.get_dqb_coords(),
                 check_condition=lambda x: x < splitting_coord + threshold,
             )
 
@@ -687,7 +698,7 @@ class RotSurfCode(LogicalQubit):
                     [dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits]
                 )
                 aqbs_new = set([aqb for stab in new_stabs for aqb in stab.anc_qubits])
-                dqb_coords_new = {qb: self.dqb_coords[qb] for qb in dqbs_new}
+                dqb_coords_new = {qb: self.get_dqb_coords()[qb] for qb in dqbs_new}
                 aqb_coords_new = {qb: self.aqb_coords[qb] for qb in aqbs_new}
                 new_dx = (
                     1
@@ -707,6 +718,7 @@ class RotSurfCode(LogicalQubit):
                     dz=new_dz,
                     dqb_coords=dqb_coords_new,
                     aqb_coords=aqb_coords_new,
+                    circ=self.circ, # Associate them with the same circuit
                 )
 
                 print(split_operator)
@@ -801,6 +813,7 @@ class RotSurfCode(LogicalQubit):
                 return new_log_qb
 
         else:  # Vertical split
+            print("Vertical split!")
             pass
 
         print("Construct first qb")
