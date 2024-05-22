@@ -443,6 +443,9 @@ class SquareLattice(Circuit):
         self.dqb_coords = {
             i: (1 + i // self.cols, 1 + i % self.cols) for i in range(self.rows * self.cols)
         }
+        self.anc_coords = {
+            i: (0.5 + i // (self.cols + 1), 0.5 + i % (self.cols + 1)) for i in range((self.rows + 1) * (self.cols + 1))
+        }
 
     def __deepcopy__(self, memo):
         new_circ = SquareLattice(name=self.name, rows=self.rows, cols=self.cols)
@@ -482,6 +485,7 @@ class SquareLattice(Circuit):
                     cnew = c + start_pos[1] - 1
                     id_map[r*logical_qubit.dz + c] = rnew * self.cols + cnew
 
+            print(id_map)
             log_qb = self.get_log_qb(logical_qubit.id, raise_exceptions=False, raise_warnings=False)
             if log_qb is None or log_qb.exists is False:
                 self.logical_qubits.append(logical_qubit)
