@@ -64,7 +64,7 @@ class Circuit(ABC):
     _circuit: Optional[CircuitList] = Field(default_factory=lambda: [])
     _m_list: List[Tuple[int, int, str, str, Union[None, str]]] = Field(
         default_factory=lambda: []
-    ) # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
+    )  # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
     _num_measurements: int = 0
     dqb_coords: Optional[Dict[int, Tuple[float, float]]] = Field(
         default_factory=lambda: {}
@@ -90,7 +90,12 @@ class Circuit(ABC):
                 return 2
         return 0
 
-    def get_log_qb(self, id: str, raise_exceptions: bool = True, raise_warnings: bool = False) -> LogicalQubit:
+    def get_log_qb(
+        self,
+        id: str,
+        raise_exceptions: bool = True,
+        raise_warnings: bool = False,
+    ) -> LogicalQubit:
         if not isinstance(id, str):
             raise ValueError("Logical qubit ID must be a string")
 
@@ -100,24 +105,32 @@ class Circuit(ABC):
             if id == qb.id:
                 log_qb = qb
                 if qb.exists is True:
-                    found_qb_but_inactive = False # Need to set back to False in case before we found an inactive qubit with the same id already
+                    found_qb_but_inactive = False  # Need to set back to False in case before we found an inactive qubit with the same id already
                     break
                 else:
                     found_qb_but_inactive = True
 
         if log_qb is None:
             if raise_exceptions:
-                raise ValueError("Logical qubit with the given ID does not exist in this circuit.")
+                raise ValueError(
+                    "Logical qubit with the given ID does not exist in this circuit."
+                )
             if raise_warnings:
-                raise Warning("Logical qubit with the given ID does not exist in this circuit.")
+                raise Warning(
+                    "Logical qubit with the given ID does not exist in this circuit."
+                )
         if found_qb_but_inactive:
             if raise_exceptions or raise_warnings:
-                raise Warning("Logical qubit ID does not exist among the active qubits but there has previously been a logical qubit with the same ID.")
+                raise Warning(
+                    "Logical qubit ID does not exist among the active qubits but there has previously been a logical qubit with the same ID."
+                )
 
         return log_qb
 
     @abstractmethod
-    def add_logical_qubit(self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (0, 0)):
+    def add_logical_qubit(
+        self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (0, 0)
+    ):
         pass
 
     def remove_logical_qubit(self, logical_qubit_id: str) -> bool:
@@ -225,7 +238,7 @@ class Circuit(ABC):
 
     def convert_to_qasm(self) -> str:
         qasm_str = "OPENQASM 3;"
-        qasm_str += "include \"stdgates.inc\";"
+        qasm_str += 'include "stdgates.inc";'
 
         # Define coordinates of logical qubits
         for log_qb in self.logical_qubits:
@@ -265,7 +278,9 @@ class Circuit(ABC):
         log_qb_id: str,
         label: Optional[str] = None,
     ) -> List[str]:
-        self._log_qb_id_valid_check(log_qb_id) # Raise exception if the provided logical qubit id is not valid
+        self._log_qb_id_valid_check(
+            log_qb_id
+        )  # Raise exception if the provided logical qubit id is not valid
         log_qb = self.get_log_qb(log_qb_id)
 
         uuids = []
@@ -274,13 +289,15 @@ class Circuit(ABC):
             if label is not None:
                 m_label = label + str(stab.pauli_op)
             else:
-                m_label = None # Pass None to the function, so that it will use the uuid as a label
+                m_label = None  # Pass None to the function, so that it will use the uuid as a label
             m_id = self.add_mmt(1, m_label, log_qb.id)
             uuids.append(m_id)
 
         return uuids
 
-    def add_par_def_syndrome_extraction_circuit_all_log_qbs(self, round: int = None) -> List[str]:
+    def add_par_def_syndrome_extraction_circuit_all_log_qbs(
+        self, round: int = None
+    ) -> List[str]:
         all_uuids = []
         for log_qb in self.logical_qubits:
             if round is not None:
@@ -294,7 +311,9 @@ class Circuit(ABC):
     def m_log(self, log_qb_id: str, basis: str, label: str = "") -> str:
         if not isinstance(log_qb_id, str):
             raise ValueError("Logical qubit ID must be a string")
-        self._log_qb_id_valid_check(log_qb_id) # Raise exception if the provided logical qubit id is not valid
+        self._log_qb_id_valid_check(
+            log_qb_id
+        )  # Raise exception if the provided logical qubit id is not valid
         log_qb = self.get_log_qb(log_qb_id)
 
         if basis == "X":
@@ -335,7 +354,9 @@ class Circuit(ABC):
     def m_log_z(self, log_qb_id: str, label: str = "") -> str:
         return self.m_log(log_qb_id, "Z", label)
 
-    def log_QST(self, log_qbs: List[str], bases: Optional[List[str]] = ["X", "Y", "Z"]) -> List[Tuple[str, Circuit]]:
+    def log_QST(
+        self, log_qbs: List[str], bases: Optional[List[str]] = ["X", "Y", "Z"]
+    ) -> List[Tuple[str, Circuit]]:
         if log_qbs is None:
             log_qbs = [c.id for c in self.logical_qubits if c.exists is True]
 
@@ -412,10 +433,10 @@ class Circuit(ABC):
         return m_id, new_log_qb1, new_log_qb2
 
     def shrink(
-            self,
-            logical_qubit_id: str,
-            num_rows: int,
-            direction: Literal["t", "b", "l", "r"],
+        self,
+        logical_qubit_id: str,
+        num_rows: int,
+        direction: Literal["t", "b", "l", "r"],
     ):
         self._log_qb_id_valid_check(logical_qubit_id)
         log_qb = self.get_log_qb(logical_qubit_id)
@@ -423,12 +444,13 @@ class Circuit(ABC):
         shrink_circ = log_qb.shrink(num_rows, direction)
         self._circuit += shrink_circ
 
+
 @dataclass
 class SquareLattice(Circuit):
     rows: int = None
     cols: int = None
 
-    def __init__(self, rows:int=None, cols:int=None):
+    def __init__(self, rows: int = None, cols: int = None):
         if rows is None:
             raise ValueError("Number of rows must be provided.")
         else:
@@ -441,10 +463,12 @@ class SquareLattice(Circuit):
 
     def __post_init__(self):
         self.dqb_coords = {
-            i: (1 + i // self.cols, 1 + i % self.cols) for i in range(self.rows * self.cols)
+            i: (1 + i // self.cols, 1 + i % self.cols)
+            for i in range(self.rows * self.cols)
         }
         self.anc_coords = {
-            i: (0.5 + i // (self.cols + 1), 0.5 + i % (self.cols + 1)) for i in range((self.rows + 1) * (self.cols + 1))
+            i: (0.5 + i // (self.cols + 1), 0.5 + i % (self.cols + 1))
+            for i in range((self.rows + 1) * (self.cols + 1))
         }
 
     def __deepcopy__(self, memo):
@@ -463,30 +487,43 @@ class SquareLattice(Circuit):
         neighbours = []
 
         for r, c in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            if 0 <= qb_idx % self.cols + c < self.cols and 0 <= qb_idx // self.cols + r < self.rows:
+            if (
+                0 <= qb_idx % self.cols + c < self.cols
+                and 0 <= qb_idx // self.cols + r < self.rows
+            ):
                 neighbours.append(qb_idx + r * self.cols + c)
 
         return neighbours
 
-    def add_logical_qubit(self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (1, 1)):
+    def add_logical_qubit(
+        self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (1, 1)
+    ):
         if isinstance(logical_qubit, RotSurfCode):
             if any([not isinstance(start_pos[i], int) for i in range(2)]):
                 raise ValueError("Start position must be a tuple of integers.")
             if any([start_pos[i] < 1 for i in range(2)]):
-                raise ValueError("Start position coordinates must be larger or equal to 1.")
+                raise ValueError(
+                    "Start position coordinates must be larger or equal to 1."
+                )
             if start_pos[1] > self.cols:
-                raise ValueError("Start position column cannot be larger than the number of columns.")
+                raise ValueError(
+                    "Start position column cannot be larger than the number of columns."
+                )
             if start_pos[0] > self.rows:
-                raise ValueError("Start position row cannot be larger than the number of rows.")
+                raise ValueError(
+                    "Start position row cannot be larger than the number of rows."
+                )
             id_map = {}
             for r in range(logical_qubit.dx):
                 for c in range(logical_qubit.dz):
                     rnew = r + start_pos[0] - 1
                     cnew = c + start_pos[1] - 1
-                    id_map[r*logical_qubit.dz + c] = rnew * self.cols + cnew
+                    id_map[r * logical_qubit.dz + c] = rnew * self.cols + cnew
 
             print(id_map)
-            log_qb = self.get_log_qb(logical_qubit.id, raise_exceptions=False, raise_warnings=False)
+            log_qb = self.get_log_qb(
+                logical_qubit.id, raise_exceptions=False, raise_warnings=False
+            )
             if log_qb is None or log_qb.exists is False:
                 self.logical_qubits.append(logical_qubit)
                 logical_qubit.circ = self
@@ -501,4 +538,6 @@ class SquareLattice(Circuit):
             else:
                 raise ValueError("Logical qubit already exists.")
         else:
-            raise NotImplementedError("Only RotSurfCode logical qubits are supported on the square lattice for now.")
+            raise NotImplementedError(
+                "Only RotSurfCode logical qubits are supported on the square lattice for now."
+            )

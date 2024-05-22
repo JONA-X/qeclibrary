@@ -337,10 +337,8 @@ class LogicalQubit(ABC):
 
     @abstractmethod
     def split(
-            self,
-            split_qbs: List[int],
-            new_ids: Tuple[str, str]
-            ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
+        self, split_qbs: List[int], new_ids: Tuple[str, str]
+    ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
         pass
 
 
@@ -565,10 +563,8 @@ class RotSurfCode(LogicalQubit):
         return self.get_def_log_op("Z")
 
     def split(
-            self,
-            split_qbs: List[int],
-            new_ids: Tuple[str, str]
-            ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
+        self, split_qbs: List[int], new_ids: Tuple[str, str]
+    ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
         threshold = 1e-3
 
         def find_split_direction(dqb_coords, split_qbs) -> Tuple[str, float]:
@@ -718,7 +714,7 @@ class RotSurfCode(LogicalQubit):
                     dz=new_dz,
                     dqb_coords=dqb_coords_new,
                     aqb_coords=aqb_coords_new,
-                    circ=self.circ, # Associate them with the same circuit
+                    circ=self.circ,  # Associate them with the same circuit
                 )
 
                 print(split_operator)
@@ -833,7 +829,11 @@ class RotSurfCode(LogicalQubit):
 
         return split_qbs_mmt_circ, new_qb1, new_qb2, split_operator
 
-    def shrink(self, num_rows: int, direction: Literal["t", "b", "l", "r"]) -> CircuitList:
+    def shrink(
+        self,
+        num_rows: int,
+        direction: Literal["t", "b", "l", "r"],
+    ) -> CircuitList:
         """_summary_
 
         Parameters
@@ -857,9 +857,10 @@ class RotSurfCode(LogicalQubit):
 
             qubits_to_measure = []
 
-
         elif direction in ["t", "b", "l"]:
-            raise NotImplementedError("Shrinking in this direction is not yet supported.")
+            raise NotImplementedError(
+                "Shrinking in this direction is not yet supported."
+            )
         else:
             raise ValueError("Invalid direction. Must be in ['t', 'b', 'l', 'r']")
 

@@ -50,7 +50,7 @@ class QECPlot:
                 name="Data qubits",
                 showlegend=True,
                 legendgroup="qpu_dqbs",
-                )
+            )
             self.add_dqubits(
                 self.circ.anc_coords,
                 color="lightgray",
@@ -59,18 +59,18 @@ class QECPlot:
                 name="Ancilla qubits",
                 showlegend=True,
                 legendgroup="qpu_aqbs",
-                )
+            )
 
     def add_dqubits(
-            self,
-            dqb_coords,
-            color: str = "gray",
-            number_inside_marker: bool = True,
-            marker_size: int = 25,
-            name: str = "",
-            showlegend: bool = False,
-            legendgroup: str = "",
-            ):
+        self,
+        dqb_coords,
+        color: str = "gray",
+        number_inside_marker: bool = True,
+        marker_size: int = 25,
+        name: str = "",
+        showlegend: bool = False,
+        legendgroup: str = "",
+    ):
         if number_inside_marker:
             mode = "markers+text"
         else:
@@ -85,18 +85,18 @@ class QECPlot:
                     mode=mode,
                     name=name,
                     marker=dict(
-                                size=marker_size,
-                                color=color,
-                                line=dict(
-                                    width=1,
-                                    color="darkred",
-                                ),
-                            ),
+                        size=marker_size,
+                        color=color,
+                        line=dict(
+                            width=1,
+                            color="darkred",
+                        ),
+                    ),
                     text=qb_id,
                     textposition="middle center",
                     hoverinfo="text",
                     legendgroup=legendgroup,
-                    showlegend=(showlegend and i==0),
+                    showlegend=(showlegend and i == 0),
                 )
             )
             i += 1
@@ -105,7 +105,9 @@ class QECPlot:
         if isinstance(obj, LogicalQubit):
             stabs = obj.stabilizers
             legend_qb = obj.id
-        elif isinstance(obj, list) and not any(isinstance(stab, Stabilizer) for stab in obj):
+        elif isinstance(obj, list) and not any(
+            isinstance(stab, Stabilizer) for stab in obj
+        ):
             stabs = obj
             legend_qb = ""
         else:
@@ -118,8 +120,8 @@ class QECPlot:
             s_coords = np.array(s_coords)
             self.fig.add_trace(
                 go.Scatter(
-                    x=s_coords[:,1],
-                    y=s_coords[:,0],
+                    x=s_coords[:, 1],
+                    y=s_coords[:, 0],
                     mode="lines",
                     fill="toself",
                     line=dict(
@@ -128,6 +130,6 @@ class QECPlot:
                     ),
                     hoverinfo="none",
                     legendgroup=f"stabs_{legend_qb}",
-                    showlegend=i==0,
+                    showlegend=i == 0,
                 )
             )

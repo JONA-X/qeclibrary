@@ -4,6 +4,7 @@ from typing import Union, List, Optional, Dict, Tuple
 
 CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
 
+
 class NoiseModel:
     pass
 
