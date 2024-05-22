@@ -28,6 +28,15 @@ class TestRotSurfCode(unittest.TestCase):
         }
         self.assertEqual(self.Q1.get_pauli_charges(), expected_pauli_charges)
 
+    def test_h_trans_raw(self):
+        circ_list = self.Q1.h_trans_raw()
+        circ_list_expected = [["H", [0, 1, 2, 3, 4, 5, 6, 7, 8]], ["Barrier", []]]
+        # Check that H is the same. Check the sets of qubits since their order might be different
+        self.assertEqual(circ_list[0][0], circ_list_expected[0][0])
+        self.assertEqual(set(circ_list[0][1]), set(circ_list_expected[0][1]))
+        # Check that barrier exists
+        self.assertEqual(circ_list[1], circ_list_expected[1])
+
 
 if __name__ == "__main__":
     unittest.main()

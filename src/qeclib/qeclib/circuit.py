@@ -108,9 +108,7 @@ class Circuit(ABC):
 
         for qb_id, qb in self.log_qbs.items():
             if qb_id == logical_qubit_id:
-                qb.exists = (
-                    False  # Mark the original logical qubit as non-existent
-                )
+                qb.exists = False  # Mark the original logical qubit as non-existent
                 return True
 
         return False
@@ -121,7 +119,9 @@ class Circuit(ABC):
 
         log_qb = self.exists_log_qb(log_qb_id)
         if log_qb == 0:
-            raise ValueError(f"Logical qubit ID {log_qb_id} does not exist in this circuit.")
+            raise ValueError(
+                f"Logical qubit ID {log_qb_id} does not exist in this circuit."
+            )
         if log_qb == 2:
             raise ValueError(
                 f"Logical qubit with iD {log_qb_id} does not exist anymore due to a previous merge or split."
@@ -237,7 +237,9 @@ class Circuit(ABC):
         )  # Raise exception if the provided logical qubit id is not valid
 
         uuids = []
-        self._circuit += self.log_qbs[log_qb_id].get_par_def_syndrome_extraction_circuit()
+        self._circuit += self.log_qbs[
+            log_qb_id
+        ].get_par_def_syndrome_extraction_circuit()
         for i, stab in enumerate(self.log_qbs[log_qb_id].stabilizers):
             if label is not None:
                 m_label = label + str(stab.pauli_op)
@@ -278,7 +280,8 @@ class Circuit(ABC):
             m_circ = self.log_qbs[log_qb_id].m_log_y()
             n = self.log_qbs[log_qb_id].log_y.length()
             corrections_list = (
-                self.log_qbs[log_qb_id].log_x_corrections + self.log_qbs[log_qb_id].log_z_corrections
+                self.log_qbs[log_qb_id].log_x_corrections
+                + self.log_qbs[log_qb_id].log_z_corrections
             )  # Do both corrections
             self.log_qbs[log_qb_id].log_x_corrections = []  # Clear the corrections list
             self.log_qbs[log_qb_id].log_z_corrections = []  # Clear the corrections list
@@ -355,9 +358,9 @@ class Circuit(ABC):
     ) -> Tuple[str, str, str]:
         self.log_qb_id_valid_check(log_qb_id)
 
-        split_circ, new_log_qb1, new_log_qb2, split_operator = self.log_qbs[log_qb_id].split(
-            split_qbs, new_ids
-        )
+        split_circ, new_log_qb1, new_log_qb2, split_operator = self.log_qbs[
+            log_qb_id
+        ].split(split_qbs, new_ids)
 
         self._circuit += split_circ
         m_id = self.add_mmt(len(split_qbs), log_qb_id=log_qb_id)
@@ -365,7 +368,9 @@ class Circuit(ABC):
         print(f"Split operator: {split_operator}")
         if split_operator == "X":
             measured_split_qb = list(
-                set(split_qbs).intersection(set(self.log_qbs[log_qb_id].log_x.data_qubits))
+                set(split_qbs).intersection(
+                    set(self.log_qbs[log_qb_id].log_x.data_qubits)
+                )
             )[0]
             new_log_qb1.log_x_corrections.append(
                 (m_id, split_qbs.index(measured_split_qb))
@@ -373,7 +378,9 @@ class Circuit(ABC):
             # TODO: Add the corrections for Z_L
         elif split_operator == "Z":
             measured_split_qb = list(
-                set(split_qbs).intersection(set(self.log_qbs[log_qb_id].log_z.data_qubits))
+                set(split_qbs).intersection(
+                    set(self.log_qbs[log_qb_id].log_z.data_qubits)
+                )
             )[0]
             new_log_qb1.log_z_corrections.append(
                 (m_id, split_qbs.index(measured_split_qb))
@@ -422,7 +429,8 @@ class SquareLattice(Circuit):
             for i in range(self.rows * self.cols)
         }
         self.aqb_coords = {
-            len(self.dqb_coords) + i: (0.5 + i // (self.cols + 1), 0.5 + i % (self.cols + 1))
+            len(self.dqb_coords)
+            + i: (0.5 + i // (self.cols + 1), 0.5 + i % (self.cols + 1))
             for i in range((self.rows + 1) * (self.cols + 1))
         }
 
@@ -482,9 +490,14 @@ class SquareLattice(Circuit):
                 for c in range(logical_qubit.dz + 1):
                     rnew = r + start_pos[0] - 1
                     cnew = c + start_pos[1] - 1
-                    aqb_id_map[r * (logical_qubit.dz + 1) + c + anc_start_id_old] = anc_start_id_new + rnew * (self.cols + 1) + cnew
+                    aqb_id_map[r * (logical_qubit.dz + 1) + c + anc_start_id_old] = (
+                        anc_start_id_new + rnew * (self.cols + 1) + cnew
+                    )
 
-            if logical_qubit.id not in self.log_qbs or self.log_qbs[logical_qubit.id].exists is False:
+            if (
+                logical_qubit.id not in self.log_qbs
+                or self.log_qbs[logical_qubit.id].exists is False
+            ):
                 self.log_qbs[logical_qubit.id] = logical_qubit
                 logical_qubit.circ = self
                 for stab in logical_qubit.stabilizers:

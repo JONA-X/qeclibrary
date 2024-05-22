@@ -524,12 +524,6 @@ class RotSurfCode(LogicalQubit):
     def _get_qb_id_from_coords(self, row: int, col: int) -> int:
         return row * self.dz + col
 
-    def transversal_h(self) -> CircuitList:
-        circuit_list = []
-        for qbs in self._get_data_qubits():
-            circuit_list.append(["H", qbs])
-        return circuit_list
-
     def get_def_log_op(self, basis: str) -> PauliOp:
         # Idea: Start at one logical corner (i.e. with Pauli charge Y) and move along
         # an X/Z boundary (specified by basis argument) until reaching another logical corner

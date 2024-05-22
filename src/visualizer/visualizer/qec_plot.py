@@ -19,7 +19,18 @@ class QECPlot:
     width: int = 1100
     height: int = 700
     _log_qb_counter: int = 0
-    _log_qb_default_color: Tuple[str] = ('#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf')
+    _log_qb_default_color: Tuple[str] = (
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+    )
     _colors_XYZ: Dict[str, str] = Field(
         default_factory=lambda: {"X": "#57C95A", "Y": "#F0A0E9", "Z": "#5AAEE6"}
     )
@@ -154,5 +165,8 @@ class QECPlot:
     def plot_logical_qubit(self, qb_id: str):
         self.circ.log_qb_id_valid_check(qb_id)
         self.plot_stabilizers(qb_id)
-        self.add_dqubits(self.circ.log_qbs[qb_id].get_dqb_coords(), color=self._log_qb_default_color[self._log_qb_counter])
+        self.add_dqubits(
+            self.circ.log_qbs[qb_id].get_dqb_coords(),
+            color=self._log_qb_default_color[self._log_qb_counter],
+        )
         self._log_qb_counter += 1
