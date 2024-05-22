@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple, Literal
+from typing import Dict, Tuple
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 import numpy as np
@@ -17,6 +18,11 @@ class QECPlot:
     y_axis_visible: bool = False
     width: int = 1100
     height: int = 700
+    _log_qb_counter: int = 0
+    _log_qb_default_color: Tuple[str] = ('#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf')
+    _colors_XYZ: Dict[str, str] = Field(
+        default_factory=lambda: {"X": "#57C95A", "Y": "#F0A0E9", "Z": "#5AAEE6"}
+    )
 
     def __post_init__(self) -> None:
         # Create the figure object
@@ -52,7 +58,7 @@ class QECPlot:
                 legendgroup="qpu_dqbs",
             )
             self.add_dqubits(
-                self.circ.anc_coords,
+                self.circ.aqb_coords,
                 color="lightgray",
                 number_inside_marker=False,
                 marker_size=15,
@@ -101,19 +107,27 @@ class QECPlot:
             )
             i += 1
 
-    def plot_stabilizers(self, obj):
+    def plot_stabilizers(self, obj, legend_qb: str = "", name: str = ""):
         if isinstance(obj, LogicalQubit):
             stabs = obj.stabilizers
-            legend_qb = obj.id
+            if legend_qb == "":
+                legend_qb = obj.id
+            if name == "":
+                name = obj.id
         elif isinstance(obj, list) and not any(
-            isinstance(stab, Stabilizer) for stab in obj
+            not isinstance(stab, Stabilizer) for stab in obj
         ):
             stabs = obj
-            legend_qb = ""
         else:
             raise ValueError("Invalid input for plot_stabilizers")
 
         for i, stab in enumerate(stabs):
+            is_css = True if len(set(stab.pauli_op.pauli_string)) == 1 else False
+            if is_css:
+                color = self._colors_XYZ[stab.pauli_op.pauli_string[0]]
+            else:
+                color = self._colors_XYZ["Z"]
+
             coords = [self.circ.dqb_coords[qb] for qb in stab.pauli_op.data_qubits]
             s_coords = list(sort_points(coords))
             s_coords.append(s_coords[-1])
@@ -123,7 +137,9 @@ class QECPlot:
                     x=s_coords[:, 1],
                     y=s_coords[:, 0],
                     mode="lines",
+                    name=name,
                     fill="toself",
+                    fillcolor=color,
                     line=dict(
                         color="black",
                         width=2,
@@ -133,3 +149,8 @@ class QECPlot:
                     showlegend=i == 0,
                 )
             )
+
+    def plot_logical_qubit(self, qb: LogicalQubit):
+        self.plot_stabilizers(qb)
+        self.add_dqubits(qb.get_dqb_coords(), color=self._log_qb_default_color[self._log_qb_counter])
+        self._log_qb_counter += 1

@@ -211,12 +211,11 @@ class Circuit(ABC):
     def convert_to_stim(self, noise_model: NoiseModel = None) -> str:
         stim_circ = ""
         # Define coordinates of logical qubits
-        for log_qb in self.logical_qubits:
-            for id, coords in log_qb.dqb_coords.items():
-                stim_circ += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {id}\n"
+        for id, coords in self.dqb_coords.items():
+            stim_circ += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {id}\n"
 
-            for id, coords in log_qb.aqb_coords.items():
-                stim_circ += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {id}\n"
+        for id, coords in self.aqb_coords.items():
+            stim_circ += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {id}\n"
 
         if noise_model is None:
             operation_list = self._circuit
@@ -466,8 +465,8 @@ class SquareLattice(Circuit):
             i: (1 + i // self.cols, 1 + i % self.cols)
             for i in range(self.rows * self.cols)
         }
-        self.anc_coords = {
-            i: (0.5 + i // (self.cols + 1), 0.5 + i % (self.cols + 1))
+        self.aqb_coords = {
+            len(self.dqb_coords) + i: (0.5 + i // (self.cols + 1), 0.5 + i % (self.cols + 1))
             for i in range((self.rows + 1) * (self.cols + 1))
         }
 
@@ -513,14 +512,24 @@ class SquareLattice(Circuit):
                 raise ValueError(
                     "Start position row cannot be larger than the number of rows."
                 )
-            id_map = {}
+            dqb_id_map = {}
             for r in range(logical_qubit.dx):
                 for c in range(logical_qubit.dz):
                     rnew = r + start_pos[0] - 1
                     cnew = c + start_pos[1] - 1
-                    id_map[r * logical_qubit.dz + c] = rnew * self.cols + cnew
+                    dqb_id_map[r * logical_qubit.dz + c] = rnew * self.cols + cnew
 
-            print(id_map)
+            aqb_id_map = {}
+            anc_start_id_old = logical_qubit.dx * logical_qubit.dz
+            anc_start_id_new = self.rows * self.cols
+            for r in range(logical_qubit.dx + 1):
+                for c in range(logical_qubit.dz + 1):
+                    rnew = r + start_pos[0] - 1
+                    cnew = c + start_pos[1] - 1
+                    aqb_id_map[r * (logical_qubit.dz + 1) + c + anc_start_id_old] = anc_start_id_new + rnew * (self.cols + 1) + cnew
+
+            print(aqb_id_map)
+
             log_qb = self.get_log_qb(
                 logical_qubit.id, raise_exceptions=False, raise_warnings=False
             )
@@ -529,12 +538,14 @@ class SquareLattice(Circuit):
                 logical_qubit.circ = self
                 for stab in logical_qubit.stabilizers:
                     for i, qb in enumerate(stab.pauli_op.data_qubits):
-                        stab.pauli_op.data_qubits[i] = id_map[qb]
+                        stab.pauli_op.data_qubits[i] = dqb_id_map[qb]
+                    for i, qb in enumerate(stab.anc_qubits):
+                        stab.anc_qubits[i] = aqb_id_map[qb]
 
                 for i, qb in enumerate(logical_qubit.log_x.data_qubits):
-                    logical_qubit.log_x.data_qubits[i] = id_map[qb]
+                    logical_qubit.log_x.data_qubits[i] = dqb_id_map[qb]
                 for i, qb in enumerate(logical_qubit.log_z.data_qubits):
-                    logical_qubit.log_z.data_qubits[i] = id_map[qb]
+                    logical_qubit.log_z.data_qubits[i] = dqb_id_map[qb]
             else:
                 raise ValueError("Logical qubit already exists.")
         else:

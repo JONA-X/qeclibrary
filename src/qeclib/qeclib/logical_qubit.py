@@ -29,9 +29,6 @@ class LogicalQubit(ABC):
     dqb_coords: Optional[Dict[int, Tuple[float, float]]] = Field(
         default_factory=lambda: {}
     )  # Coordinates of the data qubits
-    aqb_coords: Optional[Dict[int, Tuple[float, float]]] = Field(
-        default_factory=lambda: {}
-    )  # Coordinates of the ancilla qubits
     log_x_corrections: List[Tuple[str, int]] = Field(
         default_factory=lambda: [],
         init=False,
@@ -50,8 +47,6 @@ class LogicalQubit(ABC):
         self._check_correctness()
         if len(self.dqb_coords) == 0:
             self.create_default_dqb_coords()
-        if len(self.aqb_coords) == 0:
-            self.create_default_aqb_coords()
 
     def __setattr__(self, prop, val):
         if prop == "id":
@@ -60,10 +55,6 @@ class LogicalQubit(ABC):
 
     def create_default_dqb_coords(self):
         for qb in self._get_data_qubits():
-            self.dqb_coords[qb] = (qb, 0)
-
-    def create_default_aqb_coords(self):
-        for qb in self._get_ancilla_qubits():
             self.dqb_coords[qb] = (qb, 0)
 
     def _get_data_qubits(self) -> List[Union[int, Tuple[int, int]]]:
@@ -163,6 +154,15 @@ class LogicalQubit(ABC):
                 dqb_coords[i] = coord
         return dqb_coords
 
+    def get_aqb_coords(self) -> Dict[int, Tuple[float, float]]:
+        # TODO: Is this actually needed?
+        aqb_coords = {}
+        aqbs = self._get_ancilla_qubits()
+        for i, coord in self.circ.aqb_coords.items():
+            if i in aqbs:
+                aqb_coords[i] = coord
+        return aqb_coords
+
     def x(self) -> CircuitList:
         circuit_list = []
         qubits_dict = self.log_x.get_qubit_groups_for_XYZ()
@@ -201,6 +201,17 @@ class LogicalQubit(ABC):
         elif state in [1, "1"]:
             circ = [("R", self._get_data_qubits())]
             circ += self.x()
+            circ += [("Barrier", [])]
+            return circ
+        elif state in ["+"]:
+            circ = [("R", self._get_data_qubits())]
+            circ += self.h_trans_raw()
+            circ += [("Barrier", [])]
+            return circ
+        elif state in ["-"]:
+            circ = [("R", self._get_data_qubits())]
+            circ += self.x()
+            circ += self.h_trans_raw()
             circ += [("Barrier", [])]
             return circ
         else:
@@ -365,7 +376,6 @@ class RotSurfCode(LogicalQubit):
             log_z=self.log_z,
             exists=self.exists,
             dqb_coords=self.dqb_coords,
-            aqb_coords=self.aqb_coords,
             log_x_corrections=self.log_x_corrections,
             log_z_corrections=self.log_z_corrections,
             logical_readouts=self.logical_readouts,
@@ -394,8 +404,6 @@ class RotSurfCode(LogicalQubit):
                 self.dx * self.dz
             )  # Index of the first ancilla qubit. The data qubits are indexed from 0 to dx*dz-1 and the ancilla qubits are indexed from dx*dz to dx*dz+num_anc-1
 
-            aqb_coords = {}
-
             ## ZZZZ stabilizers
             for row in range(self.dx - 1):
                 for col in range(self.dz - 1):
@@ -415,7 +423,6 @@ class RotSurfCode(LogicalQubit):
                                 anc_qubits=[anc_idx],
                             )
                         )
-                        aqb_coords[anc_idx] = (row + 1.5, col + 1.5)
                         anc_idx += 1
 
             ## ZZ stabilizers
@@ -433,7 +440,6 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (row + 1.5, 0.5)
                     anc_idx += 1
                 else:
                     stabs.append(
@@ -448,7 +454,6 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (row + 1.5, self.dz + 0.5)
                     anc_idx += 1
 
             ## XXXX stabilizers
@@ -470,7 +475,6 @@ class RotSurfCode(LogicalQubit):
                                 anc_qubits=[anc_idx],
                             )
                         )
-                        aqb_coords[anc_idx] = (row + 1.5, col + 1.5)
                         anc_idx += 1
 
             ## XX stabilizers
@@ -488,7 +492,6 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (0.5, col + 1.5)
                     anc_idx += 1
                 else:
                     stabs.append(
@@ -503,7 +506,6 @@ class RotSurfCode(LogicalQubit):
                             anc_qubits=[anc_idx],
                         )
                     )
-                    aqb_coords[anc_idx] = (self.dx + 0.5, col + 1.5)
                     anc_idx += 1
 
             dqb_coords = {}
@@ -512,7 +514,6 @@ class RotSurfCode(LogicalQubit):
 
             self.stabilizers = stabs
             self.dqb_coords = dqb_coords
-            self.aqb_coords = aqb_coords
             self.log_x = PauliOp(
                 pauli_string="X" * self.dx,
                 data_qubits=list(np.arange(self.dx) * self.dz),
@@ -693,9 +694,7 @@ class RotSurfCode(LogicalQubit):
                 dqbs_new = set(
                     [dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits]
                 )
-                aqbs_new = set([aqb for stab in new_stabs for aqb in stab.anc_qubits])
                 dqb_coords_new = {qb: self.get_dqb_coords()[qb] for qb in dqbs_new}
-                aqb_coords_new = {qb: self.aqb_coords[qb] for qb in aqbs_new}
                 new_dx = (
                     1
                     + max([dqb_coords_new[qb][0] for qb in dqbs_new])
@@ -713,7 +712,6 @@ class RotSurfCode(LogicalQubit):
                     dx=new_dx,
                     dz=new_dz,
                     dqb_coords=dqb_coords_new,
-                    aqb_coords=aqb_coords_new,
                     circ=self.circ,  # Associate them with the same circuit
                 )
 
