@@ -3,6 +3,7 @@ from typing import Union, List, Optional, Dict, Tuple, Literal
 from abc import ABC, abstractmethod
 from pydantic import Field
 from pydantic.dataclasses import dataclass
+import copy
 
 from .pauli_op import PauliOp
 from .stabilizer import Stabilizer
@@ -371,19 +372,19 @@ class RotSurfCode(LogicalQubit):
     def __deepcopy__(self, memo):
         new_qb = RotSurfCode(
             id=self.id,
-            stabilizers=self.stabilizers,
-            log_x=self.log_x,
-            log_z=self.log_z,
             exists=self.exists,
-            dqb_coords=self.dqb_coords,
-            log_x_corrections=self.log_x_corrections,
-            log_z_corrections=self.log_z_corrections,
-            logical_readouts=self.logical_readouts,
             circ=None,
             d=self.d,
             dx=self.dx,
             dz=self.dz,
         )
+        setattr(new_qb, "stabilizers", copy.deepcopy(self.stabilizers))
+        setattr(new_qb, "log_x", copy.deepcopy(self.log_x))
+        setattr(new_qb, "log_z", copy.deepcopy(self.log_z))
+        setattr(new_qb, "dqb_coords", copy.deepcopy(self.dqb_coords))
+        setattr(new_qb, "log_x_corrections", copy.deepcopy(self.log_x_corrections))
+        setattr(new_qb, "log_z_corrections", copy.deepcopy(self.log_z_corrections))
+        setattr(new_qb, "logical_readouts", copy.deepcopy(self.logical_readouts))
         return new_qb
 
     def __post_init__(self) -> None:

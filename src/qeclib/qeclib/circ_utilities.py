@@ -15,7 +15,7 @@ def circ_log_QST_results(
     bases: List[str] = ["X", "Y", "Z"],
 ) -> Dict[str, float]:
     if log_qbs is None:
-        log_qbs = [c.id for c in circuit.logical_qubits if c.exists is True]
+        log_qbs = [qb_id for qb_id, qb in circuit.log_qbs.items() if qb.exists is True]
 
     results_dict = {}
     for basis, c in circuit.log_QST(log_qbs, bases):
