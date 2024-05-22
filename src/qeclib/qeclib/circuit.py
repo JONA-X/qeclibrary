@@ -336,6 +336,9 @@ class Circuit(ABC):
         else:
             raise ValueError("Invalid basis. Must be in ['X', 'Y', 'Z']")
 
+        print("Corrections:")
+        print(corrections_list)
+
         self._circuit += m_circ
         m_id = self.add_mmt(n, label, log_qb.id)
         log_qb.logical_readouts[m_id] = (
@@ -398,7 +401,7 @@ class Circuit(ABC):
         logical_qubit_id: str,
         split_qbs: List[int],
         new_ids: Tuple[str, str],
-    ) -> Tuple[str, LogicalQubit, LogicalQubit]:
+    ) -> Tuple[str, str, str]:
         log_qb = self.get_log_qb(logical_qubit_id)
         self._log_qb_id_valid_check(logical_qubit_id)
 
@@ -409,6 +412,7 @@ class Circuit(ABC):
         self._circuit += split_circ
         m_id = self.add_mmt(len(split_qbs), log_qb_id=log_qb.id)
 
+        print(f"Split operator: {split_operator}")
         if split_operator == "X":
             measured_split_qb = list(
                 set(split_qbs).intersection(set(log_qb.log_x.data_qubits))
@@ -428,8 +432,9 @@ class Circuit(ABC):
 
         self.remove_logical_qubit(logical_qubit_id)
         self.logical_qubits += [new_log_qb1, new_log_qb2]
+        print(new_log_qb1.log_x_corrections)
 
-        return m_id, new_log_qb1, new_log_qb2
+        return m_id, new_log_qb1.id, new_log_qb2.id
 
     def shrink(
         self,
@@ -527,8 +532,6 @@ class SquareLattice(Circuit):
                     rnew = r + start_pos[0] - 1
                     cnew = c + start_pos[1] - 1
                     aqb_id_map[r * (logical_qubit.dz + 1) + c + anc_start_id_old] = anc_start_id_new + rnew * (self.cols + 1) + cnew
-
-            print(aqb_id_map)
 
             log_qb = self.get_log_qb(
                 logical_qubit.id, raise_exceptions=False, raise_warnings=False

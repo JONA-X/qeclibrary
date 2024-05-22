@@ -113,7 +113,7 @@ class QECPlot:
             if legend_qb == "":
                 legend_qb = obj.id
             if name == "":
-                name = obj.id
+                name = f"{obj.id} stabilizers"
         elif isinstance(obj, list) and not any(
             not isinstance(stab, Stabilizer) for stab in obj
         ):
@@ -150,7 +150,8 @@ class QECPlot:
                 )
             )
 
-    def plot_logical_qubit(self, qb: LogicalQubit):
+    def plot_logical_qubit(self, qb_id: str):
+        qb = self.circ.get_log_qb(qb_id)
         self.plot_stabilizers(qb)
         self.add_dqubits(qb.get_dqb_coords(), color=self._log_qb_default_color[self._log_qb_counter])
         self._log_qb_counter += 1
