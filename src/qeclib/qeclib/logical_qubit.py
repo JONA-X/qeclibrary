@@ -192,7 +192,7 @@ class LogicalQubit(ABC):
 
     def init(self, state: Union[str, int] = 0) -> CircuitList:
         if state not in [0, 1, "0", "1", "+", "-"]:
-            raise ValueError("Invalid state. Must be in [0, 1, '0', '1', '+', '-']")
+            raise ValueError("Invalid initial state. Must be in [0, 1, '0', '1', '+', '-']")
 
         # TODO: Generalize for other cases
         if state in [0, "0"]:
