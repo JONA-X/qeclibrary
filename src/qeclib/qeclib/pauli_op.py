@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple
-from pydantic import Field, field_validator
+from typing import List
 from pydantic.dataclasses import dataclass
 
 
@@ -62,3 +61,21 @@ class PauliOp:
             if pauli != "I":
                 length += 1
         return length
+
+    def commutes_with(self, other_pauli) -> bool:
+        """Return True if the provided Pauli operator commutes with this Pauli operator
+        and False otherwise."""
+        do_commute = True
+        for i in range(max(max(self.data_qubits), max(other_pauli.data_qubits)) + 1):
+            if i in self.data_qubits and i in other_pauli.data_qubits:
+                if (
+                    self.pauli_string[self.data_qubits.index(i)] != "I"
+                    and other_pauli.pauli_string[other_pauli.data_qubits.index(i)]
+                    != "I"
+                ):
+                    if (
+                        self.pauli_string[self.data_qubits.index(i)]
+                        != other_pauli.pauli_string[other_pauli.data_qubits.index(i)]
+                    ):
+                        do_commute = not do_commute
+        return do_commute
