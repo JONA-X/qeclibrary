@@ -99,11 +99,11 @@ class Circuit(ABC):
     def remove_logical_qubit(self, logical_qubit_id: str) -> bool:
         if self.exists_log_qb(logical_qubit_id) == 0:
             raise ValueError(
-                f"Logical qubit with ID {logical_qubit_id} does not exist on the processor and cannot be deleted."
+                f"Logical qubit with id '{logical_qubit_id}' does not exist on the processor and cannot be deleted."
             )
         elif self.exists_log_qb(logical_qubit_id) == 2:
             raise ValueError(
-                f"There has been a logical qubit with name {logical_qubit_id} once but it has already been deleted. Cannot delete it again."
+                f"There has been a logical qubit with name '{logical_qubit_id}' once but it has already been deleted. Cannot delete it again."
             )
 
         for qb_id, qb in self.log_qbs.items():
@@ -115,16 +115,16 @@ class Circuit(ABC):
 
     def log_qb_id_valid_check(self, log_qb_id: str) -> bool:
         if not isinstance(log_qb_id, str):
-            raise ValueError("Logical qubit ID must be a string.")
+            raise ValueError("Logical qubit id must be a string.")
 
         log_qb = self.exists_log_qb(log_qb_id)
         if log_qb == 0:
             raise ValueError(
-                f"Logical qubit ID {log_qb_id} does not exist in this circuit."
+                f"Logical qubit id '{log_qb_id}' does not exist in this circuit."
             )
         if log_qb == 2:
             raise ValueError(
-                f"Logical qubit with iD {log_qb_id} does not exist anymore due to a previous merge or split."
+                f"Logical qubit with id '{log_qb_id}' does not exist anymore due to a previous merge or split."
             )
         return True
 
@@ -135,7 +135,7 @@ class Circuit(ABC):
 
         for mmt in self._m_list:
             if mmt[2] == label:
-                raise ValueError(f"Measurement label {label} exists in the circuit.")
+                raise ValueError(f"Measurement label '{label}' exists in the circuit.")
 
         self._m_list += [(self._num_measurements, length, label, m_id, log_qb_id)]
         self._num_measurements += length
@@ -266,7 +266,7 @@ class Circuit(ABC):
 
     def m_log(self, log_qb_id: str, basis: str, label: str = "") -> str:
         if not isinstance(log_qb_id, str):
-            raise ValueError("Logical qubit ID must be a string")
+            raise ValueError("Logical qubit id must be a string")
         self.log_qb_id_valid_check(
             log_qb_id
         )  # Raise exception if the provided logical qubit id is not valid
@@ -325,7 +325,8 @@ class Circuit(ABC):
             basis_str = "".join(basis)
             new_circ = copy.deepcopy(self)
             for i, log_qb in enumerate(log_qbs):
-                new_circ.m_log(log_qb, basis[i], f"QST_{log_qb}_{basis_str}")
+                if basis[i] != "I":
+                    new_circ.m_log(log_qb, basis[i], f"QST_{log_qb}_{basis[i]}")
             list_circuits.append((basis_str, new_circ))
         return list_circuits
 

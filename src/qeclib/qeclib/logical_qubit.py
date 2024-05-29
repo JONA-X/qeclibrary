@@ -51,7 +51,7 @@ class LogicalQubit(ABC):
 
     def __setattr__(self, prop, val):
         if prop == "id":
-            raise AttributeError("You cannot change the ID of a logical qubit.")
+            raise AttributeError("You cannot change the id of a logical qubit.")
         super().__setattr__(prop, val)
 
     def create_default_dqb_coords(self):
