@@ -18,7 +18,7 @@ class QECPlot:
     y_axis_visible: bool = False
     width: int = 1100
     height: int = 700
-    _log_qb_counter: int = 0
+    _log_qb_counter: int = 0 # Counter for logical qubits to automatically choose different colors for them
     _log_qb_default_color: Tuple[str] = (
         "#1f77b4",
         "#ff7f0e",
@@ -32,15 +32,15 @@ class QECPlot:
         "#17becf",
     )
     _colors_XYZ: Dict[str, str] = Field(
-        default_factory=lambda: {"X": "#57C95A", "Y": "#F0A0E9", "Z": "#5AAEE6"}
+        default_factory=lambda: {"X": "#5AAEE6", "Y": "#F0A0E9", "Z": "#57C95A"}
     )
 
     def __post_init__(self) -> None:
         # Create the figure object
-        self.fig = make_subplots(rows=1, cols=1)
+        self._fig = make_subplots(rows=1, cols=1)
 
         # Default plot settings
-        self.fig.update_layout(
+        self._fig.update_layout(
             width=self.width,
             height=self.height,
             showlegend=True,
@@ -78,6 +78,9 @@ class QECPlot:
                 legendgroup="qpu_aqbs",
             )
 
+    def show(self):
+        self._fig.show()
+
     def add_dqubits(
         self,
         dqb_coords,
@@ -95,7 +98,7 @@ class QECPlot:
 
         i = 0
         for qb_id, qb in dqb_coords.items():
-            self.fig.add_trace(
+            self._fig.add_trace(
                 go.Scatter(
                     x=[qb[1]],
                     y=[qb[0]],
@@ -144,7 +147,7 @@ class QECPlot:
             s_coords = list(sort_points(coords))
             s_coords.append(s_coords[-1])
             s_coords = np.array(s_coords)
-            self.fig.add_trace(
+            self._fig.add_trace(
                 go.Scatter(
                     x=s_coords[:, 1],
                     y=s_coords[:, 0],
@@ -163,10 +166,10 @@ class QECPlot:
             )
 
     def plot_logical_qubit(self, qb_id: str):
-        self.circ.log_qb_id_valid_check(qb_id)
-        self.plot_stabilizers(qb_id)
+        self.circ.log_qb_id_valid_check(qb_id) # Check logical qubit id and throw error if invalid
+        self.plot_stabilizers(qb_id) # Plot stabilizers
         self.add_dqubits(
             self.circ.log_qbs[qb_id].get_dqb_coords(),
             color=self._log_qb_default_color[self._log_qb_counter],
-        )
+        ) # Plot data qubits
         self._log_qb_counter += 1

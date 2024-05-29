@@ -5,3 +5,4 @@ from .pauli_op import *
 from .stabilizer import *
 from .utilities import *
 from .circ_utilities import *
+from visualizer import *
