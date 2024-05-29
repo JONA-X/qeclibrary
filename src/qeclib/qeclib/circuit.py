@@ -10,6 +10,7 @@ import numpy as np
 
 from .logical_qubit import LogicalQubit, RotSurfCode
 from .noise_models import NoiseModel
+from .measurement import Measurement
 
 import pprint # TODO: Remove once development is done
 
@@ -64,7 +65,7 @@ class Circuit(ABC):
     name: str
     log_qbs: Dict[str, LogicalQubit] = Field(init=False, default_factory=lambda: {})
     _circuit: Optional[CircuitList] = Field(default_factory=lambda: [])
-    _m_list: List[Tuple[int, int, str, str, Union[None, str]]] = Field(
+    _m_list: List[Measurement] = Field(
         default_factory=lambda: []
     )  # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
     _num_measurements: int = 0
@@ -130,17 +131,17 @@ class Circuit(ABC):
             )
         return True
 
-    def add_mmt(self, length: int, label: str = None, log_qb_id: str = None) -> str:
+    def add_mmt(self, number_of_mmts: int, label: str = None, log_qb_id: str = None, type: str = None, related_obj: str = None) -> str:
         m_id = str(uuid.uuid4())
         if label in [None, ""]:
             label = m_id
 
         for mmt in self._m_list:
-            if mmt[2] == label:
-                raise ValueError(f"Measurement label '{label}' exists in the circuit.")
+            if mmt.label == label:
+                raise ValueError(f"Measurement label '{label}' already exists. Labels must be unique.")
 
-        self._m_list += [(self._num_measurements, length, label, m_id, log_qb_id)]
-        self._num_measurements += length
+        self._m_list.append(Measurement(self._num_measurements, number_of_mmts, label, log_qb_id, m_id, type, related_obj))
+        self._num_measurements += number_of_mmts
         return m_id
 
     def x(self, log_qb_id: str) -> None:
@@ -224,8 +225,8 @@ class Circuit(ABC):
         uuids = []
         for log_qb in log_qbs:
             self._circuit += log_qb.get_def_syndrome_extraction_circuit()
-            m_id = self.add_mmt(len(log_qb.stabilizers), "", log_qb.id)
-            uuids.append(m_id)
+            m_ids = [self.add_mmt(1, "", log_qb.id, "stabilizer", str(stab.pauli_op)) for stab in log_qb.stabilizers]
+            uuids += m_ids
 
         return uuids
 
@@ -247,7 +248,7 @@ class Circuit(ABC):
                 m_label = label + str(stab.pauli_op)
             else:
                 m_label = None  # Pass None to the function, so that it will use the uuid as a label
-            m_id = self.add_mmt(1, m_label, log_qb_id)
+            m_id = self.add_mmt(1, m_label, log_qb_id, "stabilizer", str(stab.pauli_op))
             uuids.append(m_id)
 
         return uuids
@@ -296,7 +297,8 @@ class Circuit(ABC):
             raise ValueError("Invalid basis. Must be in ['X', 'Y', 'Z']")
 
         self._circuit += m_circ
-        m_id = self.add_mmt(n, label, log_qb_id)
+
+        m_id = self.add_mmt(n, label, log_qb_id, "log_op", log_qb_id)
         self.log_qbs[log_qb_id].logical_readouts[m_id] = (
             basis,
             corrections_list,
@@ -335,15 +337,25 @@ class Circuit(ABC):
     def dict_m_labels_to_res(self, measurements):
         res = {}
         for mmt in self._m_list:
-            label = mmt[2]
-            res[label] = measurements[mmt[0] : mmt[0] + mmt[1]]
+            res[mmt.label] = measurements[mmt.index : mmt.index + mmt.number_of_mmts]
+        return res
+
+    def dict_m_labels_to_uuids(self):
+        res = {}
+        for mmt in self._m_list:
+            res[mmt.label] = mmt.uuid
+        return res
+
+    def dict_m_uuids_to_labels(self):
+        res = {}
+        for mmt in self._m_list:
+            res[mmt.uuid] = mmt.label
         return res
 
     def dict_m_uuids_to_res(self, measurements):
         res = {}
         for mmt in self._m_list:
-            uuid = mmt[3]
-            res[uuid] = measurements[mmt[0] : mmt[0] + mmt[1]]
+            res[mmt.uuid] = measurements[mmt.index : mmt.index + mmt.number_of_mmts]
         return res
 
     def get_log_dqb_readout(self, measurements, m_id, log_qb_id: str) -> int:
@@ -358,17 +370,18 @@ class Circuit(ABC):
         log_qb_id: str,
         split_qbs: List[int],
         new_ids: Tuple[str, str],
-    ) -> Tuple[str, str, str]:
+    ):
         self.log_qb_id_valid_check(log_qb_id)
 
-        split_circ, new_log_qb1, new_log_qb2, split_operator = self.log_qbs[
+        qec_uuids = self.add_par_def_syndrome_extraction_circuit(log_qb_id)
+
+        split_circ, new_log_qb1, new_log_qb2, split_operator, log_op_update_stabs1, log_op_update_stabs2 = self.log_qbs[
             log_qb_id
         ].split(split_qbs, new_ids)
 
         self._circuit += split_circ
-        m_id = self.add_mmt(len(split_qbs), log_qb_id=log_qb_id)
+        m_id = self.add_mmt(len(split_qbs), "", log_qb_id, "split", log_qb_id)
 
-        print(f"Split operator: {split_operator}")
         if split_operator == "X":
             measured_split_qb = list(
                 set(split_qbs).intersection(
@@ -377,8 +390,19 @@ class Circuit(ABC):
             )[0]
             new_log_qb1.log_x_corrections.append(
                 (m_id, split_qbs.index(measured_split_qb))
-            )
-            # TODO: Add the corrections for Z_L
+            )  # Arbitrary choice of correcting the first qubit. We could have done the
+            # same to qubit 2 instead.
+
+            # Correct both Z_L operators
+            for id in log_op_update_stabs1:
+                new_log_qb1.log_z_corrections.append(
+                    (qec_uuids[id], 0)
+                )
+            for id in log_op_update_stabs2:
+                new_log_qb2.log_z_corrections.append(
+                    (qec_uuids[id], 0)
+                )
+
         elif split_operator == "Z":
             measured_split_qb = list(
                 set(split_qbs).intersection(
@@ -387,16 +411,15 @@ class Circuit(ABC):
             )[0]
             new_log_qb1.log_z_corrections.append(
                 (m_id, split_qbs.index(measured_split_qb))
-            )
+            )  # Arbitrary choice of correcting the first qubit. We could have done the
+            # same to qubit 2 instead.
+
             # TODO: Add the corrections for X_L
+            raise NotImplementedError("Splitting the Z operator is not yet implemented.")
 
         self.remove_logical_qubit(log_qb_id)
         self.log_qbs[new_log_qb1.id] = new_log_qb1
         self.log_qbs[new_log_qb2.id] = new_log_qb2
-        print("Corrections of new qb 1")
-        print(new_log_qb1.log_x_corrections)
-
-        return m_id, new_log_qb1.id, new_log_qb2.id
 
     def shrink(
         self,

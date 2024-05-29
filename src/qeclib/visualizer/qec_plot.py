@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
@@ -90,6 +90,8 @@ class QECPlot:
         name: str = "",
         showlegend: bool = False,
         legendgroup: str = "",
+        marker_symbol: str = "circle",
+        text_dict: dict = None,
     ):
         if number_inside_marker:
             mode = "markers+text"
@@ -111,8 +113,9 @@ class QECPlot:
                             width=1,
                             color="darkred",
                         ),
+                        symbol=marker_symbol,
                     ),
-                    text=qb_id,
+                    text=qb_id if text_dict is None else text_dict[qb_id],
                     textposition="middle center",
                     hoverinfo="text",
                     legendgroup=legendgroup,
@@ -120,6 +123,19 @@ class QECPlot:
                 )
             )
             i += 1
+
+    def plot_pauli_string(self, pauli_string: str, dqubits: List[int]):
+        dqb_coords_pauli = {}
+        text_dict = {}
+        for pauli, qb in zip(pauli_string, dqubits):
+            dqb_coords_pauli[qb] = self.circ.dqb_coords[qb]
+            text_dict[qb] = pauli + "<sub>" + str(qb) + "</sub>"
+        self.add_dqubits(
+            dqb_coords_pauli,
+            marker_symbol = "square",
+            text_dict=text_dict,
+        )
+
 
     def plot_stabilizers(self, obj, legend_qb: str = "", name: str = ""):
         if isinstance(obj, str):
@@ -172,4 +188,7 @@ class QECPlot:
             self.circ.log_qbs[qb_id].get_dqb_coords(),
             color=self._log_qb_default_color[self._log_qb_counter],
         ) # Plot data qubits
+        self.plot_pauli_string(self.circ.log_qbs[qb_id].log_x.pauli_string, self.circ.log_qbs[qb_id].log_x.data_qubits)
+        self.plot_pauli_string(self.circ.log_qbs[qb_id].log_z.pauli_string, self.circ.log_qbs[qb_id].log_z.data_qubits)
+
         self._log_qb_counter += 1

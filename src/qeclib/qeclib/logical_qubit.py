@@ -143,7 +143,6 @@ class LogicalQubit(ABC):
 
     def get_neighbour_qbs(self, qb: int) -> List[int]:
         dqbs = self._get_data_qubits()
-        print(self.circ)
         neighbors = [qb for qb in self.circ.get_neighbour_qbs(qb) if qb in dqbs]
         return neighbors
 
@@ -350,7 +349,7 @@ class LogicalQubit(ABC):
     @abstractmethod
     def split(
         self, split_qbs: List[int], new_ids: Tuple[str, str]
-    ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
+    ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str, List, List]:
         pass
 
 
@@ -636,6 +635,7 @@ class RotSurfCode(LogicalQubit):
             check_condition,
         ):
             new_stabs = []
+            boundary_stabs = []
             for stab in stabilizers:
                 num_dqbs_on_new_patch = 0  # Number of data qubits of this stabilizer which are on the left side of the split
                 for dqb in stab.pauli_op.data_qubits:
@@ -648,7 +648,7 @@ class RotSurfCode(LogicalQubit):
                 ):
                     # The stabilizer lies in the boundary region of the split
                     if set(stab.pauli_op.pauli_string) != set(split_operator):
-                        continue
+                        boundary_stabs.append(stab)
                     else:
                         # This stabilizer has to be modified to exclude the measured
                         # split qubits
@@ -669,16 +669,16 @@ class RotSurfCode(LogicalQubit):
                             reset=stab.reset,
                         )
                         new_stabs.append(new_stab)
-            return new_stabs
+            return new_stabs, boundary_stabs
 
         if split_direction == "horizontal":
-            new_stabs_left = find_new_stabs(
+            new_stabs_left, boundary_stabs_left = find_new_stabs(
                 coordinate_id=0,
                 stabilizers=self.stabilizers,
                 dqb_coords=self.get_dqb_coords(),
                 check_condition=lambda x: x > splitting_coord - threshold,
             )
-            new_stabs_right = find_new_stabs(
+            new_stabs_right, boundary_stabs_right = find_new_stabs(
                 coordinate_id=0,
                 stabilizers=self.stabilizers,
                 dqb_coords=self.get_dqb_coords(),
@@ -710,7 +710,6 @@ class RotSurfCode(LogicalQubit):
                     circ=self.circ,  # Associate them with the same circuit
                 )
 
-                print(split_operator)
                 if (
                     split_operator == "Z"
                 ):  # Z operator is split and X operator is not split
@@ -805,11 +804,16 @@ class RotSurfCode(LogicalQubit):
             print("Vertical split!")
             pass
 
-        print("Construct first qb")
         new_qb1 = construct_new_log_qb(new_stabs_left, new_ids[0])
-        print("Construct second qb")
         new_qb2 = construct_new_log_qb(new_stabs_right, new_ids[1])
-        print("Done")
+        log_op_update_stabs1 = []
+        for stab in boundary_stabs_left:
+            if list(set(stab.pauli_op.pauli_string))[0] != split_operator:
+                log_op_update_stabs1.append(self.stabilizers.index(stab))
+        log_op_update_stabs2 = []
+        for stab in boundary_stabs_right:
+            if list(set(stab.pauli_op.pauli_string))[0] != split_operator:
+                log_op_update_stabs2.append(self.stabilizers.index(stab))
 
         split_qbs_mmt_circ = []
         if split_operator == "X":
@@ -820,7 +824,7 @@ class RotSurfCode(LogicalQubit):
             ["M", split_qbs],
         ]
 
-        return split_qbs_mmt_circ, new_qb1, new_qb2, split_operator
+        return split_qbs_mmt_circ, new_qb1, new_qb2, split_operator, log_op_update_stabs1, log_op_update_stabs2
 
     def shrink(
         self,
