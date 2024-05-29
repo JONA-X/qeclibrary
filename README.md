@@ -1,5 +1,23 @@
 # QEClib
 
+## Installation
+
+```bash
+pip install -e src/qeclib
+```
+
+For developers also install Black:
+```bash
+pip install "black[jupyter]"
+```
+
+Then in Python import the module using:
+
+```python
+import qeclib
+```
+
+
 ## Features
 
 Codes that are currently supported:
