@@ -24,8 +24,10 @@ def circ_log_QST_results(
         for r in res:
             shot_readout = 0
             mmts = c.dict_m_labels_to_res(r)
-            for qb in log_qbs:
-                final_readout = np.array(mmts[f"QST_{qb}_{basis}"], dtype=int)
+            for i, qb in enumerate(log_qbs):
+                if basis[i] == "I":
+                    continue
+                final_readout = np.array(mmts[f"QST_{qb}_{basis[i]}"], dtype=int)
                 shot_readout += np.sum(final_readout)
             summed_res += shot_readout % 2
         summed_res /= num_shots

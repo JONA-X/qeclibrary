@@ -11,6 +11,8 @@ import numpy as np
 from .logical_qubit import LogicalQubit, RotSurfCode
 from .noise_models import NoiseModel
 
+import pprint # TODO: Remove once development is done
+
 CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
 
 op_names: List[str] = [
@@ -311,10 +313,10 @@ class Circuit(ABC):
         return self.m_log(log_qb_id, "Z", label)
 
     def log_QST(
-        self, log_qbs: List[str], bases: Optional[List[str]] = ["X", "Y", "Z"]
+        self, log_qbs: List[str] = None, bases: Optional[List[str]] = ["X", "Y", "Z"]
     ) -> List[Tuple[str, Circuit]]:
         if log_qbs is None:
-            log_qbs = [c.id for c in self.log_qbs if c.exists is True]
+            log_qbs = [qb_id for qb_id, qb in self.log_qbs.items() if qb.exists is True]
 
         if not isinstance(log_qbs, list):
             log_qbs = [log_qbs]
@@ -441,10 +443,10 @@ class SquareLattice(Circuit):
         for log_qb_id, log_qb in log_qbs.items():
             log_qb.circ = new_circ
         new_circ.log_qbs = log_qbs
-        new_circ._circuit = self._circuit
-        new_circ._m_list = self._m_list
+        new_circ._circuit = copy.deepcopy(self._circuit)
+        new_circ._m_list = copy.deepcopy(self._m_list)
         new_circ._num_measurements = self._num_measurements
-        new_circ.dqb_coords = self.dqb_coords
+        new_circ.dqb_coords = copy.deepcopy(self.dqb_coords)
         return new_circ
 
     def get_neighbour_qbs(self, qb_idx: int) -> List[int]:
