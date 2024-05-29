@@ -29,21 +29,23 @@ def circ_log_QST_results(
             for i, qb in enumerate(log_qbs):
                 if basis[i] == "I":
                     continue
-                shot_readout += c.get_log_dqb_readout(r, labels_to_uuids[f"QST_{qb}_{basis[i]}"], qb)
+                shot_readout += c.get_log_dqb_readout(
+                    r, labels_to_uuids[f"QST_{qb}_{basis[i]}"], qb
+                )
             summed_res += shot_readout % 2
         summed_res /= num_shots
         results_dict[basis] = summed_res
     return results_dict
 
 
-def plot_log_QST_results(res_dict, qb_names = ["Q1", "Q2"]):
+def plot_log_QST_results(res_dict, qb_names=["Q1", "Q2"]):
     single_qb_bases = []
     for two_qb_basis in res_dict.keys():
         if two_qb_basis[0] not in single_qb_bases:
             single_qb_bases.append(two_qb_basis[0])
 
-    fig = plt.figure(figsize=(10,6))
-    ax1 = fig.add_subplot(111, projection='3d')
+    fig = plt.figure(figsize=(10, 6))
+    ax1 = fig.add_subplot(111, projection="3d")
 
     x = []
     y = []
@@ -58,7 +60,19 @@ def plot_log_QST_results(res_dict, qb_names = ["Q1", "Q2"]):
     width = np.ones(num_elements)
     depth = np.ones(num_elements)
 
-    ax1.bar3d(x, y, bottom, width, depth, z, color='hotpink', alpha=0.5, edgecolor=(0.2, 0.2, 0.2, 0.9), linewidth=1, linestyle='solid')
+    ax1.bar3d(
+        x,
+        y,
+        bottom,
+        width,
+        depth,
+        z,
+        color="hotpink",
+        alpha=0.5,
+        edgecolor=(0.2, 0.2, 0.2, 0.9),
+        linewidth=1,
+        linestyle="solid",
+    )
 
     xticks = np.arange(0.5, 0.5 + len(single_qb_bases), 1)
     ax1.set_xticks(xticks)

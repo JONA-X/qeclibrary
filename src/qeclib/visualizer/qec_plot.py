@@ -18,7 +18,9 @@ class QECPlot:
     y_axis_visible: bool = False
     width: int = 1100
     height: int = 700
-    _log_qb_counter: int = 0 # Counter for logical qubits to automatically choose different colors for them
+    _log_qb_counter: int = (
+        0  # Counter for logical qubits to automatically choose different colors for them
+    )
     _log_qb_default_color: Tuple[str] = (
         "#1f77b4",
         "#ff7f0e",
@@ -132,10 +134,9 @@ class QECPlot:
             text_dict[qb] = pauli + "<sub>" + str(qb) + "</sub>"
         self.add_dqubits(
             dqb_coords_pauli,
-            marker_symbol = "square",
+            marker_symbol="square",
             text_dict=text_dict,
         )
-
 
     def plot_stabilizers(self, obj, legend_qb: str = "", name: str = ""):
         if isinstance(obj, str):
@@ -182,13 +183,21 @@ class QECPlot:
             )
 
     def plot_logical_qubit(self, qb_id: str):
-        self.circ.log_qb_id_valid_check(qb_id) # Check logical qubit id and throw error if invalid
-        self.plot_stabilizers(qb_id) # Plot stabilizers
+        self.circ.log_qb_id_valid_check(
+            qb_id
+        )  # Check logical qubit id and throw error if invalid
+        self.plot_stabilizers(qb_id)  # Plot stabilizers
         self.add_dqubits(
             self.circ.log_qbs[qb_id].get_dqb_coords(),
             color=self._log_qb_default_color[self._log_qb_counter],
-        ) # Plot data qubits
-        self.plot_pauli_string(self.circ.log_qbs[qb_id].log_x.pauli_string, self.circ.log_qbs[qb_id].log_x.data_qubits)
-        self.plot_pauli_string(self.circ.log_qbs[qb_id].log_z.pauli_string, self.circ.log_qbs[qb_id].log_z.data_qubits)
+        )  # Plot data qubits
+        self.plot_pauli_string(
+            self.circ.log_qbs[qb_id].log_x.pauli_string,
+            self.circ.log_qbs[qb_id].log_x.data_qubits,
+        )
+        self.plot_pauli_string(
+            self.circ.log_qbs[qb_id].log_z.pauli_string,
+            self.circ.log_qbs[qb_id].log_z.data_qubits,
+        )
 
         self._log_qb_counter += 1

@@ -191,7 +191,9 @@ class LogicalQubit(ABC):
 
     def init(self, state: Union[str, int] = 0) -> CircuitList:
         if state not in [0, 1, "0", "1", "+", "-"]:
-            raise ValueError("Invalid initial state. Must be in [0, 1, '0', '1', '+', '-']")
+            raise ValueError(
+                "Invalid initial state. Must be in [0, 1, '0', '1', '+', '-']"
+            )
 
         # TODO: Generalize for other cases
         if state in [0, "0"]:
@@ -824,7 +826,14 @@ class RotSurfCode(LogicalQubit):
             ["M", split_qbs],
         ]
 
-        return split_qbs_mmt_circ, new_qb1, new_qb2, split_operator, log_op_update_stabs1, log_op_update_stabs2
+        return (
+            split_qbs_mmt_circ,
+            new_qb1,
+            new_qb2,
+            split_operator,
+            log_op_update_stabs1,
+            log_op_update_stabs2,
+        )
 
     def shrink(
         self,

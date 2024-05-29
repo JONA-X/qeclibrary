@@ -12,7 +12,7 @@ from .logical_qubit import LogicalQubit, RotSurfCode
 from .noise_models import NoiseModel
 from .measurement import Measurement
 
-import pprint # TODO: Remove once development is done
+import pprint  # TODO: Remove once development is done
 
 CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
 
@@ -131,16 +131,35 @@ class Circuit(ABC):
             )
         return True
 
-    def add_mmt(self, number_of_mmts: int, label: str = None, log_qb_id: str = None, type: str = None, related_obj: str = None) -> str:
+    def add_mmt(
+        self,
+        number_of_mmts: int,
+        label: str = None,
+        log_qb_id: str = None,
+        type: str = None,
+        related_obj: str = None,
+    ) -> str:
         m_id = str(uuid.uuid4())
         if label in [None, ""]:
             label = m_id
 
         for mmt in self._m_list:
             if mmt.label == label:
-                raise ValueError(f"Measurement label '{label}' already exists. Labels must be unique.")
+                raise ValueError(
+                    f"Measurement label '{label}' already exists. Labels must be unique."
+                )
 
-        self._m_list.append(Measurement(self._num_measurements, number_of_mmts, label, log_qb_id, m_id, type, related_obj))
+        self._m_list.append(
+            Measurement(
+                self._num_measurements,
+                number_of_mmts,
+                label,
+                log_qb_id,
+                m_id,
+                type,
+                related_obj,
+            )
+        )
         self._num_measurements += number_of_mmts
         return m_id
 
@@ -225,7 +244,10 @@ class Circuit(ABC):
         uuids = []
         for log_qb in log_qbs:
             self._circuit += log_qb.get_def_syndrome_extraction_circuit()
-            m_ids = [self.add_mmt(1, "", log_qb.id, "stabilizer", str(stab.pauli_op)) for stab in log_qb.stabilizers]
+            m_ids = [
+                self.add_mmt(1, "", log_qb.id, "stabilizer", str(stab.pauli_op))
+                for stab in log_qb.stabilizers
+            ]
             uuids += m_ids
 
         return uuids
@@ -375,9 +397,14 @@ class Circuit(ABC):
 
         qec_uuids = self.add_par_def_syndrome_extraction_circuit(log_qb_id)
 
-        split_circ, new_log_qb1, new_log_qb2, split_operator, log_op_update_stabs1, log_op_update_stabs2 = self.log_qbs[
-            log_qb_id
-        ].split(split_qbs, new_ids)
+        (
+            split_circ,
+            new_log_qb1,
+            new_log_qb2,
+            split_operator,
+            log_op_update_stabs1,
+            log_op_update_stabs2,
+        ) = self.log_qbs[log_qb_id].split(split_qbs, new_ids)
 
         self._circuit += split_circ
         m_id = self.add_mmt(len(split_qbs), "", log_qb_id, "split", log_qb_id)
@@ -395,13 +422,9 @@ class Circuit(ABC):
 
             # Correct both Z_L operators
             for id in log_op_update_stabs1:
-                new_log_qb1.log_z_corrections.append(
-                    (qec_uuids[id], 0)
-                )
+                new_log_qb1.log_z_corrections.append((qec_uuids[id], 0))
             for id in log_op_update_stabs2:
-                new_log_qb2.log_z_corrections.append(
-                    (qec_uuids[id], 0)
-                )
+                new_log_qb2.log_z_corrections.append((qec_uuids[id], 0))
 
         elif split_operator == "Z":
             measured_split_qb = list(
@@ -415,7 +438,9 @@ class Circuit(ABC):
             # same to qubit 2 instead.
 
             # TODO: Add the corrections for X_L
-            raise NotImplementedError("Splitting the Z operator is not yet implemented.")
+            raise NotImplementedError(
+                "Splitting the Z operator is not yet implemented."
+            )
 
         self.remove_logical_qubit(log_qb_id)
         self.log_qbs[new_log_qb1.id] = new_log_qb1
