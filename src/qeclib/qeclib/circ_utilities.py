@@ -1,6 +1,3 @@
-from __future__ import annotations
-from typing import Union, List, Dict
-
 import numpy as np
 
 from .logical_qubit import LogicalQubit
@@ -12,10 +9,10 @@ from mpl_toolkits.mplot3d import Axes3D
 
 def circ_log_QST_results(
     circuit: Circuit,
-    log_qbs: Union[None, List[str]] = None,
+    log_qbs: list[str] | None = None,
     num_shots: int = 1000,
-    bases: List[str] = ["X", "Y", "Z"],
-) -> Dict[str, float]:
+    bases: list[str] = ["X", "Y", "Z"],
+) -> dict[str, float]:
     if log_qbs is None:
         log_qbs = [qb_id for qb_id, qb in circuit.log_qbs.items() if qb.exists is True]
 

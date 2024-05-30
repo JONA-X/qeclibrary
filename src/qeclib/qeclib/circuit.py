@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple, Literal
+from typing import Literal
 from abc import ABC, abstractmethod
 from pydantic import Field
 from pydantic.dataclasses import dataclass
@@ -12,11 +12,9 @@ from .logical_qubit import LogicalQubit, RotSurfCode
 from .noise_models import NoiseModel
 from .measurement import Measurement
 
-import pprint  # TODO: Remove once development is done
+CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 
-CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
-
-op_names: List[str] = [
+op_names: list[str] = [
     "R",
     "X",
     "Y",
@@ -29,7 +27,7 @@ op_names: List[str] = [
     "MR",
     "Barrier",
 ]
-internal_op_to_stim_map: Dict[str, str] = {
+internal_op_to_stim_map: dict[str, str] = {
     "R": "R",
     "X": "X",
     "Y": "Y",
@@ -45,7 +43,7 @@ internal_op_to_stim_map: Dict[str, str] = {
     "DEPOLARIZE2": "DEPOLARIZE2",
 }
 
-internal_op_to_qasm_str_map: Dict[str, str] = {
+internal_op_to_qasm_str_map: dict[str, str] = {
     "R": "R",
     "X": "X",
     "Y": "Y",
@@ -63,13 +61,13 @@ internal_op_to_qasm_str_map: Dict[str, str] = {
 @dataclass()
 class Circuit(ABC):
     name: str
-    log_qbs: Dict[str, LogicalQubit] = Field(init=False, default_factory=lambda: {})
-    _circuit: Optional[CircuitList] = Field(default_factory=lambda: [])
-    _m_list: List[Measurement] = Field(
+    log_qbs: dict[str, LogicalQubit] = Field(init=False, default_factory=lambda: {})
+    _circuit: CircuitList | None = Field(default_factory=lambda: [])
+    _m_list: list[Measurement] = Field(
         default_factory=lambda: []
     )  # Format of tuples: (Start index in measurement list, length (= number of measured qubits), label, measurement id, id of logical qubit that was measured)
     _num_measurements: int = 0
-    dqb_coords: Optional[Dict[int, Tuple[float, float]]] = Field(
+    dqb_coords: dict[int, tuple[float, float]] | None = Field(
         default_factory=lambda: {}
     )  # Map from data qubit indices to coordinates
 
@@ -77,7 +75,7 @@ class Circuit(ABC):
     def __deepcopy__(self, memo):
         pass
 
-    def print_logical_qubits(self, only_active: Optional[bool] = True):
+    def print_logical_qubits(self, only_active: bool | None = True):
         for qb_id, qb in self.log_qbs.items():
             if not only_active or qb.exists:
                 print(qb.id)
@@ -95,7 +93,7 @@ class Circuit(ABC):
 
     @abstractmethod
     def add_logical_qubit(
-        self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (0, 0)
+        self, logical_qubit: LogicalQubit, start_pos: tuple[int, int] = (0, 0)
     ):
         pass
 
@@ -179,7 +177,7 @@ class Circuit(ABC):
         if self.log_qb_id_valid_check(log_qb_id):
             self._circuit += self.log_qbs[log_qb_id].h_trans_raw()
 
-    def init(self, log_qb_id: str, state: Union[str, int]) -> None:
+    def init(self, log_qb_id: str, state: str | int) -> None:
         """
 
         Parameters
@@ -236,7 +234,7 @@ class Circuit(ABC):
         return qasm_str
 
     def add_def_syndrome_extraction_circuit(
-        self, log_qbs: List[LogicalQubit] = []
+        self, log_qbs: list[LogicalQubit] = []
     ) -> None:
         if len(log_qbs) == 0:
             log_qbs = self.log_qbs
@@ -255,8 +253,8 @@ class Circuit(ABC):
     def add_par_def_syndrome_extraction_circuit(
         self,
         log_qb_id: str,
-        label: Optional[str] = None,
-    ) -> List[str]:
+        label: str | None = None,
+    ) -> list[str]:
         self.log_qb_id_valid_check(
             log_qb_id
         )  # Raise exception if the provided logical qubit id is not valid
@@ -277,7 +275,7 @@ class Circuit(ABC):
 
     def add_par_def_syndrome_extraction_circuit_all_log_qbs(
         self, round: int = None
-    ) -> List[str]:
+    ) -> list[str]:
         all_uuids = []
         for log_qb_id, log_qb in self.log_qbs.items():
             if round is not None:
@@ -337,8 +335,8 @@ class Circuit(ABC):
         return self.m_log(log_qb_id, "Z", label)
 
     def log_QST(
-        self, log_qbs: List[str] = None, bases: Optional[List[str]] = ["X", "Y", "Z"]
-    ) -> List[Tuple[str, Circuit]]:
+        self, log_qbs: list[str] = None, bases: list[str] | None = ["X", "Y", "Z"]
+    ) -> list[tuple[str, Circuit]]:
         if log_qbs is None:
             log_qbs = [qb_id for qb_id, qb in self.log_qbs.items() if qb.exists is True]
 
@@ -390,8 +388,8 @@ class Circuit(ABC):
     def split(
         self,
         log_qb_id: str,
-        split_qbs: List[int],
-        new_ids: Tuple[str, str],
+        split_qbs: list[int],
+        new_ids: tuple[str, str],
     ):
         self.log_qb_id_valid_check(log_qb_id)
 
@@ -497,7 +495,7 @@ class SquareLattice(Circuit):
         new_circ.dqb_coords = copy.deepcopy(self.dqb_coords)
         return new_circ
 
-    def get_neighbour_qbs(self, qb_idx: int) -> List[int]:
+    def get_neighbour_qbs(self, qb_idx: int) -> list[int]:
         neighbours = []
 
         for r, c in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
@@ -510,7 +508,7 @@ class SquareLattice(Circuit):
         return neighbours
 
     def add_logical_qubit(
-        self, logical_qubit: LogicalQubit, start_pos: Tuple[int, int] = (1, 1)
+        self, logical_qubit: LogicalQubit, start_pos: tuple[int, int] = (1, 1)
     ):
         if isinstance(logical_qubit, RotSurfCode):
             if any([not isinstance(start_pos[i], int) for i in range(2)]):

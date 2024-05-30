@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple, Literal
+from typing import Literal
 from abc import ABC, abstractmethod
 from pydantic import Field
 from pydantic.dataclasses import dataclass
@@ -10,7 +10,7 @@ from .stabilizer import Stabilizer
 
 import numpy as np
 
-CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
+CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 
 
 @dataclass()
@@ -21,24 +21,24 @@ class LogicalQubit(ABC):
     """
 
     id: str
-    stabilizers: Optional[List[Stabilizer]] = None
-    log_x: Optional[PauliOp] = None
-    log_z: Optional[PauliOp] = None
+    stabilizers: list[Stabilizer] | None = None
+    log_x: PauliOp | None = None
+    log_z: PauliOp | None = None
     exists: bool = (
         True  # Will be set to False once the qubit is merged with another qubit or split into qubits
     )
-    dqb_coords: Optional[Dict[int, Tuple[float, float]]] = Field(
+    dqb_coords: dict[int, tuple[float, float]] | None = Field(
         default_factory=lambda: {}
     )  # Coordinates of the data qubits
-    log_x_corrections: List[Tuple[str, int]] = Field(
+    log_x_corrections: list[tuple[str, int]] = Field(
         default_factory=lambda: [],
         init=False,
     )
-    log_z_corrections: List[Tuple[str, int]] = Field(
+    log_z_corrections: list[tuple[str, int]] = Field(
         default_factory=lambda: [],
         init=False,
     )
-    logical_readouts: Dict[str, Tuple[str, List[Tuple[str, int]]]] = Field(
+    logical_readouts: dict[str, tuple[str, list[tuple[str, int]]]] = Field(
         default_factory=lambda: {},
         init=False,
     )
@@ -58,7 +58,7 @@ class LogicalQubit(ABC):
         for qb in self._get_data_qubits():
             self.dqb_coords[qb] = (qb, 0)
 
-    def _get_data_qubits(self) -> List[Union[int, Tuple[int, int]]]:
+    def _get_data_qubits(self) -> list[int | tuple[int, int]]:
         data_qubit_indices = []
         for stab in self.stabilizers:
             for qb in stab.pauli_op.data_qubits:
@@ -66,7 +66,7 @@ class LogicalQubit(ABC):
                     data_qubit_indices.append(qb)
         return data_qubit_indices
 
-    def _get_ancilla_qubits(self) -> List[Union[int, Tuple[int, int]]]:
+    def _get_ancilla_qubits(self) -> list[int | tuple[int, int]]:
         ancilla_qubit_indices = []
         for stab in self.stabilizers:
             for qb in stab.anc_qubits:
@@ -141,12 +141,12 @@ class LogicalQubit(ABC):
         else:
             print("- The logical X and Z operators do not anticommute :(")
 
-    def get_neighbour_qbs(self, qb: int) -> List[int]:
+    def get_neighbour_qbs(self, qb: int) -> list[int]:
         dqbs = self._get_data_qubits()
         neighbors = [qb for qb in self.circ.get_neighbour_qbs(qb) if qb in dqbs]
         return neighbors
 
-    def get_dqb_coords(self) -> Dict[int, Tuple[float, float]]:
+    def get_dqb_coords(self) -> dict[int, tuple[float, float]]:
         dqb_coords = {}
         dqbs = self._get_data_qubits()
         for i, coord in self.circ.dqb_coords.items():
@@ -154,7 +154,7 @@ class LogicalQubit(ABC):
                 dqb_coords[i] = coord
         return dqb_coords
 
-    def get_aqb_coords(self) -> Dict[int, Tuple[float, float]]:
+    def get_aqb_coords(self) -> dict[int, tuple[float, float]]:
         # TODO: Is this actually needed?
         aqb_coords = {}
         aqbs = self._get_ancilla_qubits()
@@ -189,7 +189,7 @@ class LogicalQubit(ABC):
         circuit_list += [["Barrier", []]]
         return circuit_list
 
-    def init(self, state: Union[str, int] = 0) -> CircuitList:
+    def init(self, state: str | int = 0) -> CircuitList:
         if state not in [0, 1, "0", "1", "+", "-"]:
             raise ValueError(
                 "Invalid initial state. Must be in [0, 1, '0', '1', '+', '-']"
@@ -350,8 +350,8 @@ class LogicalQubit(ABC):
 
     @abstractmethod
     def split(
-        self, split_qbs: List[int], new_ids: Tuple[str, str]
-    ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str, List, List]:
+        self, split_qbs: list[int], new_ids: tuple[str, str]
+    ) -> tuple[CircuitList, LogicalQubit, LogicalQubit, str, list, list]:
         pass
 
 
@@ -362,11 +362,11 @@ class RotSurfCode(LogicalQubit):
     supported.
     """
 
-    d: Optional[int] = (
+    d: int | None = (
         None  # Code distance along both axes. If d is provided, dx and dz cannot be provided separately
     )
-    dx: Optional[int] = None  # Number of rows, minimum length of the X operator
-    dz: Optional[int] = None  # Number of columns, minimum length of the Z operator
+    dx: int | None = None  # Number of rows, minimum length of the X operator
+    dz: int | None = None  # Number of columns, minimum length of the Z operator
     # So left and right boundary are Z boundaries
     # Top and bottom boundary are X boundaries
 
@@ -560,11 +560,11 @@ class RotSurfCode(LogicalQubit):
         return self.get_def_log_op("Z")
 
     def split(
-        self, split_qbs: List[int], new_ids: Tuple[str, str]
-    ) -> Tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
+        self, split_qbs: list[int], new_ids: tuple[str, str]
+    ) -> tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
         threshold = 1e-3
 
-        def find_split_direction(dqb_coords, split_qbs) -> Tuple[str, float]:
+        def find_split_direction(dqb_coords, split_qbs) -> tuple[str, float]:
             """Finds the direction of the split (either horizontal or vertical),
             based on the coordinates of the split qubits and the coordinates of the
             data qubits."""
@@ -632,7 +632,7 @@ class RotSurfCode(LogicalQubit):
 
         def find_new_stabs(
             coordinate_id: int,
-            stabilizers: List[Stabilizer],
+            stabilizers: list[Stabilizer],
             dqb_coords,
             check_condition,
         ):
@@ -688,9 +688,9 @@ class RotSurfCode(LogicalQubit):
             )
 
             def construct_new_log_qb(new_stabs, new_id):
-                dqbs_new = set(
-                    [dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits]
-                )
+                dqbs_new = {
+                    dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits
+                }
                 dqb_coords_new = {qb: self.get_dqb_coords()[qb] for qb in dqbs_new}
                 new_dx = (
                     1
