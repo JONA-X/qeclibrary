@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-with open("README.md", "r") as readme_file:
+with open("../../README.md", "r") as readme_file:
     readme = readme_file.read()
 
 with open("_version.py") as f:
@@ -11,6 +11,9 @@ requirements = [
     "pydantic",
     "numpy",
     "stim",
+    "matplotlib",
+    "nbformat>=4.2.0",
+    "plotly",
 ]
 
 setup(
