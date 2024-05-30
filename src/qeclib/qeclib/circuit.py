@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Literal
 from abc import ABC, abstractmethod
 from pydantic import Field
@@ -336,7 +335,7 @@ class Circuit(ABC):
 
     def log_QST(
         self, log_qbs: list[str] = None, bases: list[str] | None = ["X", "Y", "Z"]
-    ) -> list[tuple[str, Circuit]]:
+    ) -> list[tuple[str, "Circuit"]]:
         if log_qbs is None:
             log_qbs = [qb_id for qb_id, qb in self.log_qbs.items() if qb.exists is True]
 

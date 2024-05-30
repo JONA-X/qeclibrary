@@ -1,8 +1,4 @@
-from __future__ import annotations
-from typing import Union, List, Optional, Dict, Tuple
-
-
-CircuitList = List[Tuple[str, List[Union[int, Tuple[int, int]]]]]
+CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 
 
 class NoiseModel:
@@ -25,7 +21,7 @@ class PauliNoiseModel(NoiseModel):
     def add_errors_to_circuit(
         self,
         op_list: CircuitList,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         op_list_with_errors = []
         for op in op_list:
             if op[0] == "R":

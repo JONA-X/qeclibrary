@@ -1,5 +1,4 @@
-from __future__ import annotations
-from typing import Optional, Literal
+from typing import Literal
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 import uuid
@@ -11,8 +10,8 @@ class Measurement:
     number_of_mmts: int
     label: str
     log_qb_id: str
-    uuid: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
-    type: Optional[Literal["stabilizer", "log_op", "shrink", "split", "other"]] = (
+    uuid: str | None = Field(default_factory=lambda: str(uuid.uuid4()))
+    type: Literal["stabilizer", "log_op", "shrink", "split", "other"] | None = (
         "other"
     )
-    related_obj: Optional[str] = None  # Can be used to reference a stabilizer
+    related_obj: str | None = None  # Can be used to reference a stabilizer

@@ -1,12 +1,10 @@
-from __future__ import annotations
-from typing import List
 from pydantic.dataclasses import dataclass
 
 
 @dataclass()
 class PauliOp:
     pauli_string: str  # String consisting of 'I', 'X', 'Y', 'Z' characters
-    data_qubits: List[int]  # Involved data qubit indices. List must have the
+    data_qubits: list[int]  # Involved data qubit indices. List must have the
     # same length as pauli_string
 
     def __post_init__(self) -> None:

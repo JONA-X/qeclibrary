@@ -1,10 +1,7 @@
-from __future__ import annotations
-from typing import List
-
 from .stabilizer import Stabilizer
 
 
-def number_of_data_qubits_in_stab_list(stabs: List[Stabilizer]) -> int:
+def number_of_data_qubits_in_stab_list(stabs: list[Stabilizer]) -> int:
     """Returns the number of data qubits involved in the given list of
     stabilizers.
 

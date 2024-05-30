@@ -1,12 +1,10 @@
-from __future__ import annotations
-from typing import Dict, Tuple, List
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from qeclib import Circuit, Stabilizer, LogicalQubit
+from qeclib import Circuit, Stabilizer
 from .plotting_utils import sort_points
 
 
@@ -21,7 +19,7 @@ class QECPlot:
     _log_qb_counter: int = (
         0  # Counter for logical qubits to automatically choose different colors for them
     )
-    _log_qb_default_color: Tuple[str] = (
+    _log_qb_default_color: tuple[str] = (
         "#1f77b4",
         "#ff7f0e",
         "#2ca02c",
@@ -33,7 +31,7 @@ class QECPlot:
         "#bcbd22",
         "#17becf",
     )
-    _colors_XYZ: Dict[str, str] = Field(
+    _colors_XYZ: dict[str, str] = Field(
         default_factory=lambda: {"X": "#5AAEE6", "Y": "#F0A0E9", "Z": "#57C95A"}
     )
 
@@ -126,7 +124,7 @@ class QECPlot:
             )
             i += 1
 
-    def plot_pauli_string(self, pauli_string: str, dqubits: List[int]):
+    def plot_pauli_string(self, pauli_string: str, dqubits: list[int]):
         dqb_coords_pauli = {}
         text_dict = {}
         for pauli, qb in zip(pauli_string, dqubits):

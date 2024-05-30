@@ -1,10 +1,7 @@
-from __future__ import annotations
-from typing import Union, List, Dict, Tuple
-
 import numpy as np
 
 
-def sort_points(points: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+def sort_points(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     center_point = np.mean(points, axis=0)
     points_w_angle = []
     for i, point in enumerate(points):

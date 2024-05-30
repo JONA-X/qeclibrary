@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Literal
 from abc import ABC, abstractmethod
 from pydantic import Field
@@ -351,7 +350,7 @@ class LogicalQubit(ABC):
     @abstractmethod
     def split(
         self, split_qbs: list[int], new_ids: tuple[str, str]
-    ) -> tuple[CircuitList, LogicalQubit, LogicalQubit, str, list, list]:
+    ) -> tuple[CircuitList, "LogicalQubit", "LogicalQubit", str, list, list]:
         pass
 
 
@@ -363,7 +362,8 @@ class RotSurfCode(LogicalQubit):
     """
 
     d: int | None = (
-        None  # Code distance along both axes. If d is provided, dx and dz cannot be provided separately
+        None  # Code distance along both axes.
+        # If d is provided, dx and dz cannot be provided separately
     )
     dx: int | None = None  # Number of rows, minimum length of the X operator
     dz: int | None = None  # Number of columns, minimum length of the Z operator
@@ -858,10 +858,11 @@ class RotSurfCode(LogicalQubit):
         if direction == "r":
             if num_rows > self.dz - 1:
                 raise ValueError(
-                    f"Cannot remove {num_rows} columns since there are only {self.dz} columns. We need at least one column remaining after shrinking."
+                    f"Cannot remove {num_rows} columns since there are only {self.dz} "
+                    "columns. We need at least one column remaining after shrinking."
                 )
 
-            qubits_to_measure = []
+            # qubits_to_measure = []
 
         elif direction in ["t", "b", "l"]:
             raise NotImplementedError(
