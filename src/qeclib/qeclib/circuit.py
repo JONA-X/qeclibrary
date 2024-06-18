@@ -466,7 +466,7 @@ class Circuit(ABC):
         self._circuit += grow_circ
 
     def get_connected_dqbs_in_set(self, starting_qubit: Qubit, qubit_set: set[Qubit]) -> set[Qubit]:
-        queue = self.get_neighbour_dqbs(starting_qubit)
+        queue = [starting_qubit]
         neighbors = []
         while len(queue) > 0:
             current_qb = queue.pop(0)
