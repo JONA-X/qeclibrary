@@ -503,7 +503,6 @@ class RotSurfCode(LogicalQubit):
         completed = False
         while not completed:
             for next_qb in self.get_neighbour_dqbs(current_qb):
-                print(next_qb)
                 if next_qb in already_visited:
                     continue
 
@@ -525,11 +524,42 @@ class RotSurfCode(LogicalQubit):
     def get_def_log_z(self) -> PauliOp:
         return self.get_def_log_op("Z")
 
+    def split_qbs_along_op(self, split_qbs: list[Qubit]) -> tuple[set[Qubit], set[Qubit]]:
+        dqbs_wo_split_qbs = set(self._get_data_qubits()) - set(split_qbs)
+        dqbs_set1 = set(self.circ.get_connected_dqbs_in_set(list(dqbs_wo_split_qbs)[0], dqbs_wo_split_qbs))
+        # Check whether the two sets contain the same qubits (must be ==, cannot be is)
+        if dqbs_set1 == dqbs_wo_split_qbs:
+            raise ValueError(f"The split qubits do not separate the logical qubit patch into two patches. Check again the list of split qubits and consider adding additional split qubits. Split qubits: {split_qbs}")
+
+        dqbs_set2 = dqbs_wo_split_qbs - dqbs_set1
+        return dqbs_set1, dqbs_set2
+
+    def get_qbs_between_two_ops(self, op1: PauliOp, op2: PauliOp) -> list[Qubit]:
+        if set(op1.data_qubits) == set(op2.data_qubits):
+            # If the two operators are the same, there are no qubits between them
+            return []
+
+        split1_set1, split1_set2 = self.split_qbs_along_op(op1.data_qubits)
+
+        if len(set(op2.data_qubits) & split1_set1) != 0:
+            set_after_split1 = split1_set1
+        elif len(set(op2.data_qubits) & split1_set2) != 0:
+            set_after_split1 = split1_set2
+        else:
+            raise ValueError("The two operators do not cross the same split region.")
+
+        split2_set1, split2_set2 = self.split_qbs_along_op(op2.data_qubits)
+
+        if len(set(op1.data_qubits) & split2_set1) != 0:
+            set_after_split2 = split2_set1
+        elif len(set(op1.data_qubits) & split2_set2) != 0:
+            set_after_split2 = split2_set2
+
+        return set_after_split1 & set_after_split2
+
     def split(
         self, split_qbs: list[Qubit], new_ids: tuple[str, str]
     ) -> tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
-        threshold = 1e-3
-
         def get_splitted_op(split_qbs: list[Qubit]) -> str:
             """Returns `X` if the logical X operator is split, `Z` if the logical Z
             operator is split."""
@@ -634,30 +664,34 @@ class RotSurfCode(LogicalQubit):
             if splitted_op == "Z":
                 new_log_qb.log_z = get_log_op_intersection(self.log_z, dqbs_new)
                 new_log_qb.log_x = new_log_qb.get_def_log_x()
+                qbs_between = self.get_qbs_between_two_ops(new_log_qb.log_x, self.log_x)
+                qbs_between_incl_ops = list(qbs_between) + new_log_qb.log_x.data_qubits + self.log_x.data_qubits
             elif splitted_op == "X":
                 new_log_qb.log_x = get_log_op_intersection(self.log_x, dqbs_new)
                 new_log_qb.log_z = new_log_qb.get_def_log_z()
+                qbs_between = self.get_qbs_between_two_ops(new_log_qb.log_z, self.log_z)
+                qbs_between_incl_ops = list(qbs_between) + new_log_qb.log_z.data_qubits + self.log_z.data_qubits
 
-            return new_log_qb
+            stabs_for_correction = []
+            for stab in self.stabilizers:
+                if len(set(stab.pauli_op.data_qubits) & set(qbs_between_incl_ops)) == len(set(stab.pauli_op.data_qubits)) and stab.pauli_op.pauli_string[0] != splitted_op:
+                    stabs_for_correction.append(stab)
+            log_op_update = []
+            for stab in stabs_for_correction:
+                    log_op_update.append(self.stabilizers.index(stab))
+
+            return new_log_qb, log_op_update
 
         if not set(split_qbs) <= set(self._get_data_qubits()):
             raise ValueError(f"The split qubits are not contained in the set of data qubits of this logical qubit. Split qubits: {split_qbs}")
 
-        dqbs_wo_split_qbs = set(self._get_data_qubits()) - set(split_qbs)
-        dqbs_log_qb1 = set(self.circ.get_connected_dqbs_in_set(list(dqbs_wo_split_qbs)[0], dqbs_wo_split_qbs))
-        # Check whether the two sets contain the same qubits (must be ==, cannot be is)
-        if dqbs_log_qb1 == dqbs_wo_split_qbs:
-            raise ValueError(f"The split qubits do not separate the logical qubit patch into two patches. Check again the list of split qubits and consider adding additional split qubits. Split qubits: {split_qbs}")
-
-        dqbs_log_qb2 = dqbs_wo_split_qbs - dqbs_log_qb1
+        dqbs_log_qb1, dqbs_log_qb2 = self.split_qbs_along_op(split_qbs)
 
         splitted_op = get_splitted_op(split_qbs)
         stabs_log_qb1 = find_stabs_from_dqbs(dqbs_log_qb1, splitted_op)
         stabs_log_qb2 = find_stabs_from_dqbs(dqbs_log_qb2, splitted_op)
-        new_qb1 = construct_new_log_qb(stabs_log_qb1, new_ids[0], splitted_op)
-        new_qb2 = construct_new_log_qb(stabs_log_qb2, new_ids[1], splitted_op)
-        pprint.pp(new_qb1)
-        pprint.pp(new_qb2)
+        new_qb1, new_qb1_log_op_update = construct_new_log_qb(stabs_log_qb1, new_ids[0], splitted_op)
+        new_qb2, new_qb2_log_op_update = construct_new_log_qb(stabs_log_qb2, new_ids[1], splitted_op)
 
         split_qbs_mmt_circ = []
         if splitted_op == "X":
@@ -667,144 +701,15 @@ class RotSurfCode(LogicalQubit):
         split_qbs_mmt_circ += [
             ["M", split_qbs],
         ]
-        log_op_update_stabs1 = []
-        log_op_update_stabs2 = []
 
         return (
             split_qbs_mmt_circ,
             new_qb1,
             new_qb2,
             splitted_op,
-            log_op_update_stabs1,
-            log_op_update_stabs2,
+            new_qb1_log_op_update,
+            new_qb2_log_op_update,
         )
-
-
-        def construct_new_log_qb(new_stabs, new_id):
-                dqbs_new = {
-                    dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits
-                }
-                dqb_coords_new
-                new_dx = (
-                    1
-                    + max([dqb_coords_new[qb][0] for qb in dqbs_new])
-                    - min([dqb_coords_new[qb][0] for qb in dqbs_new])
-                )
-                new_dz = (
-                    1
-                    + max([dqb_coords_new[qb][1] for qb in dqbs_new])
-                    - min([dqb_coords_new[qb][1] for qb in dqbs_new])
-                )
-
-                new_log_qb = RotSurfCode(
-                    new_id,
-                    stabilizers=new_stabs,
-                    dx=new_dx,
-                    dz=new_dz,
-                    circ=self.circ,  # Associate them with the same circuit
-                )
-
-                if (
-                    split_operator == "Z"
-                ):  # Z operator is split and X operator is not split
-                    if len(
-                        set(dqb_coords_new).intersection(set(self.log_x.data_qubits))
-                    ) == len(self.log_x.data_qubits):
-                        # Logical X is contained on this patch. So just take the old
-                        # logical X operator.
-                        new_log_qb.log_x = self.log_x
-                    elif (
-                        len(
-                            set(dqb_coords_new).intersection(
-                                set(self.log_x.data_qubits)
-                            )
-                        )
-                        == 0
-                    ):
-                        # Logical X is contained on the other patch. So find a new valid
-                        # logical X operator.
-                        new_log_qb.log_x = new_log_qb.get_def_log_x()
-                    else:
-                        raise RuntimeError(
-                            f"The logical X operator is not split but it has length {len(self.log_x.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_x.data_qubits)))} of its qubits are contained on the new patch."
-                        )
-
-                    new_log_z_pauli_str = ""
-                    new_log_z_qbs = []
-                    for i, qb in enumerate(self.log_z.data_qubits):
-                        if qb in dqbs_new:
-                            new_log_z_pauli_str += self.log_z.pauli_string[i]
-                            new_log_z_qbs.append(qb)
-                    new_log_qb.log_z = PauliOp(
-                        pauli_string=new_log_z_pauli_str, data_qubits=new_log_z_qbs
-                    )
-
-                elif (
-                    split_operator == "X"
-                ):  # X operator is split and Z operator is not split
-                    if len(
-                        set(dqb_coords_new).intersection(set(self.log_z.data_qubits))
-                    ) == len(self.log_z.data_qubits):
-                        # Logical Z is contained on this patch. So just take the old
-                        # logical Z operator.
-                        new_log_qb.log_z = self.log_z
-                    elif (
-                        len(
-                            set(dqb_coords_new).intersection(
-                                set(self.log_z.data_qubits)
-                            )
-                        )
-                        == 0
-                    ):
-                        # Logical Z is contained on the other patch. So find a new valid
-                        # logical Z operator.
-                        new_log_qb.log_z = new_log_qb.get_def_log_z()
-                    else:
-                        raise RuntimeError(
-                            f"The logical Z operator is not split but it has length {len(self.log_z.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits)))} of its qubits are contained on the new patch."
-                        )
-
-                    if len(
-                        set(dqb_coords_new).intersection(set(self.log_z.data_qubits))
-                    ) == len(self.log_z.data_qubits):
-                        new_log_qb.log_z = self.log_z
-                    elif (
-                        len(
-                            set(dqb_coords_new).intersection(
-                                set(self.log_z.data_qubits)
-                            )
-                        )
-                        == 0
-                    ):
-                        new_log_qb.log_z = new_log_qb.get_def_log_z()
-                    else:
-                        raise RuntimeError(
-                            f"The logical Z operator is not split but it has length {len(self.log_z.data_qubits)} while {len(set(dqb_coords_new).intersection(set(self.log_z.data_qubits)))} qubits are contained on the new patch."
-                        )
-
-                    new_log_x_pauli_str = ""
-                    new_log_x_qbs = []
-                    for i, qb in enumerate(self.log_x.data_qubits):
-                        if qb in dqbs_new:
-                            new_log_x_pauli_str += self.log_x.pauli_string[i]
-                            new_log_x_qbs.append(qb)
-                    new_log_qb.log_x = PauliOp(
-                        pauli_string=new_log_x_pauli_str, data_qubits=new_log_x_qbs
-                    )
-
-                return new_log_qb
-
-        new_qb1 = construct_new_log_qb(new_stabs_left, new_ids[0])
-        new_qb2 = construct_new_log_qb(new_stabs_right, new_ids[1])
-        log_op_update_stabs1 = []
-        for stab in boundary_stabs_left:
-            if list(set(stab.pauli_op.pauli_string))[0] != split_operator:
-                log_op_update_stabs1.append(self.stabilizers.index(stab))
-        log_op_update_stabs2 = []
-        for stab in boundary_stabs_right:
-            if list(set(stab.pauli_op.pauli_string))[0] != split_operator:
-                log_op_update_stabs2.append(self.stabilizers.index(stab))
-
 
     def shrink(
         self,
