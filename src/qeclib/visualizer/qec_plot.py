@@ -5,15 +5,15 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from qeclib import Circuit, Stabilizer
-from .plotting_utils import sort_points
+from .plotting_utils import sort_points, hex_to_rgb
 
 
 @dataclass()
 class QECPlot:
     circ: Circuit = None
-    show_grid: bool = False
-    x_axis_visible: bool = False
-    y_axis_visible: bool = False
+    show_grid: bool = True # TODO Cahnge
+    x_axis_visible: bool = True # TODO Cahnge
+    y_axis_visible: bool = True # TODO Cahnge
     width: int = 1100
     height: int = 700
     _log_qb_counter: int = (
@@ -54,24 +54,24 @@ class QECPlot:
                 "visible": self.y_axis_visible,
                 "scaleanchor": "x",
                 "scaleratio": 1,
-                "autorange": True,  # Otherwise y axis would be reversed
+                "autorange": "reversed",  # Otherwise y axis would be reversed
             },
         )
 
         # Plot data and ancilla qubits
         if self.circ is not None:
             self.add_dqubits(
-                self.circ.dqb_coords,
+                self.circ.dqb_coords.keys(),
                 color="gray",
-                number_inside_marker=False,
+                number_inside_marker=True, # TODO Change back to false
                 name="Data qubits",
                 showlegend=True,
                 legendgroup="qpu_dqbs",
             )
             self.add_dqubits(
-                self.circ.aqb_coords,
+                self.circ.aqb_coords.keys(),
                 color="lightgray",
-                number_inside_marker=False,
+                number_inside_marker=True,# TODO Change back to false
                 marker_size=15,
                 name="Ancilla qubits",
                 showlegend=True,
@@ -99,11 +99,12 @@ class QECPlot:
             mode = "markers"
 
         i = 0
-        for qb_id, qb in dqb_coords.items():
+        for qb in dqb_coords:
+            qb_coords = self.circ.get_qb_coords(qb)
             self._fig.add_trace(
                 go.Scatter(
-                    x=[qb[1]],
-                    y=[qb[0]],
+                    x=[qb_coords[0]],
+                    y=[qb_coords[1]],
                     mode=mode,
                     name=name,
                     marker=dict(
@@ -115,7 +116,7 @@ class QECPlot:
                         ),
                         symbol=marker_symbol,
                     ),
-                    text=qb_id if text_dict is None else text_dict[qb_id],
+                    text=str(qb) if text_dict is None else text_dict[qb],
                     textposition="middle center",
                     hoverinfo="text",
                     legendgroup=legendgroup,
@@ -157,28 +158,66 @@ class QECPlot:
                 color = self._colors_XYZ[stab.pauli_op.pauli_string[0]]
             else:
                 color = self._colors_XYZ["Z"]
+            color = "rgba(" + ",".join(map(str, hex_to_rgb(color))) + ",0.8)"
 
             coords = [self.circ.dqb_coords[qb] for qb in stab.pauli_op.data_qubits]
-            s_coords = list(sort_points(coords))
-            s_coords.append(s_coords[-1])
-            s_coords = np.array(s_coords)
-            self._fig.add_trace(
-                go.Scatter(
-                    x=s_coords[:, 1],
-                    y=s_coords[:, 0],
-                    mode="lines",
-                    name=name,
-                    fill="toself",
-                    fillcolor=color,
-                    line=dict(
-                        color="black",
-                        width=2,
-                    ),
-                    hoverinfo="none",
-                    legendgroup=f"stabs_{legend_qb}",
-                    showlegend=i == 0,
+            if len(coords) > 2:
+                s_coords = list(sort_points(coords))
+                s_coords.append(s_coords[-1])
+                s_coords = np.array(s_coords)
+                self._fig.add_trace(
+                    go.Scatter(
+                        x=s_coords[:, 0],
+                        y=s_coords[:, 1],
+                        mode="lines",
+                        name=name,
+                        fill="toself",
+                        fillcolor=color,
+                        line=dict(
+                            color="black",
+                            width=2,
+                        ),
+                        hoverinfo="none",
+                        legendgroup=f"stabs_{legend_qb}",
+                        showlegend=i == 0,
+                    )
                 )
-            )
+            elif len(coords) == 2:
+                stab_size = 0.1
+                if coords[0][0] == coords[1][0]:
+                    s_coords = [
+                        [coords[0][0] - stab_size, coords[0][1]],
+                        [coords[0][0] + stab_size, coords[0][1]],
+                        [coords[1][0] - stab_size, coords[1][1]],
+                        [coords[1][0] + stab_size, coords[1][1]],
+                        ]
+                else:
+                    s_coords = [
+                        [coords[0][0], coords[0][1] - stab_size],
+                        [coords[0][0], coords[0][1] + stab_size],
+                        [coords[1][0], coords[1][1] - stab_size],
+                        [coords[1][0], coords[1][1] + stab_size],
+                        ]
+                s_coords = list(sort_points(s_coords))
+                s_coords.append(s_coords[-1])
+                s_coords = np.array(s_coords)
+                self._fig.add_trace(
+                    go.Scatter(
+                        x=s_coords[:, 0],
+                        y=s_coords[:, 1],
+                        mode="lines",
+                        name=name,
+                        fill="toself",
+                        fillcolor=color,
+                        line=dict(
+                            color="black",
+                            width=2,
+                        ),
+                        hoverinfo="none",
+                        legendgroup=f"stabs_{legend_qb}",
+                        showlegend=i == 0,
+                    )
+                )
 
     def plot_logical_qubit(self, qb_id: str):
         self.circ.log_qb_id_valid_check(

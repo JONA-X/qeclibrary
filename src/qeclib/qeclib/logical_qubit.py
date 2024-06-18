@@ -10,7 +10,8 @@ from .stabilizer import Stabilizer
 import numpy as np
 
 CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
-
+Qubit = tuple[int, ...]
+import pprint
 
 @dataclass()
 class LogicalQubit(ABC):
@@ -26,9 +27,6 @@ class LogicalQubit(ABC):
     exists: bool = (
         True  # Will be set to False once the qubit is merged with another qubit or split into qubits
     )
-    dqb_coords: dict[int, tuple[float, float]] | None = Field(
-        default_factory=lambda: {}
-    )  # Coordinates of the data qubits
     log_x_corrections: list[tuple[str, int]] = Field(
         default_factory=lambda: [],
         init=False,
@@ -45,17 +43,11 @@ class LogicalQubit(ABC):
 
     def __post_init__(self) -> None:
         self._check_correctness()
-        if len(self.dqb_coords) == 0:
-            self.create_default_dqb_coords()
 
     def __setattr__(self, prop, val):
         if prop == "id":
             raise AttributeError("You cannot change the id of a logical qubit.")
         super().__setattr__(prop, val)
-
-    def create_default_dqb_coords(self):
-        for qb in self._get_data_qubits():
-            self.dqb_coords[qb] = (qb, 0)
 
     def _get_data_qubits(self) -> list[int | tuple[int, int]]:
         data_qubit_indices = []
@@ -140,27 +132,16 @@ class LogicalQubit(ABC):
         else:
             print("- The logical X and Z operators do not anticommute :(")
 
-    def get_neighbour_qbs(self, qb: int) -> list[int]:
+    def get_neighbour_dqbs(self, qb: int) -> list[int]:
         dqbs = self._get_data_qubits()
-        neighbors = [qb for qb in self.circ.get_neighbour_qbs(qb) if qb in dqbs]
+        neighbors = [qb for qb in self.circ.get_neighbour_dqbs(qb) if qb in dqbs]
         return neighbors
 
     def get_dqb_coords(self) -> dict[int, tuple[float, float]]:
-        dqb_coords = {}
-        dqbs = self._get_data_qubits()
-        for i, coord in self.circ.dqb_coords.items():
-            if i in dqbs:
-                dqb_coords[i] = coord
-        return dqb_coords
+        return {index: self.circ.qb_coords[index] for index in self._get_data_qubits()}
 
     def get_aqb_coords(self) -> dict[int, tuple[float, float]]:
-        # TODO: Is this actually needed?
-        aqb_coords = {}
-        aqbs = self._get_ancilla_qubits()
-        for i, coord in self.circ.aqb_coords.items():
-            if i in aqbs:
-                aqb_coords[i] = coord
-        return aqb_coords
+        return {index: self.circ.qb_coords[index] for index in self._get_ancilla_qubits()}
 
     def x(self) -> CircuitList:
         circuit_list = []
@@ -349,7 +330,7 @@ class LogicalQubit(ABC):
 
     @abstractmethod
     def split(
-        self, split_qbs: list[int], new_ids: tuple[str, str]
+        self, split_qbs: list[tuple[int, ...]], new_ids: tuple[str, str]
     ) -> tuple[CircuitList, "LogicalQubit", "LogicalQubit", str, list, list]:
         pass
 
@@ -365,10 +346,10 @@ class RotSurfCode(LogicalQubit):
         None  # Code distance along both axes.
         # If d is provided, dx and dz cannot be provided separately
     )
-    dx: int | None = None  # Number of rows, minimum length of the X operator
-    dz: int | None = None  # Number of columns, minimum length of the Z operator
-    # So left and right boundary are Z boundaries
-    # Top and bottom boundary are X boundaries
+    dx: int | None = None  # Number of columns, minimum length of the X operator
+    dz: int | None = None  # Number of rows, minimum length of the Z operator
+    # So X operator goes from left to right
+    # Z operator goes trom top to bottom
 
     def __deepcopy__(self, memo):
         new_qb = RotSurfCode(
@@ -382,7 +363,6 @@ class RotSurfCode(LogicalQubit):
         setattr(new_qb, "stabilizers", copy.deepcopy(self.stabilizers))
         setattr(new_qb, "log_x", copy.deepcopy(self.log_x))
         setattr(new_qb, "log_z", copy.deepcopy(self.log_z))
-        setattr(new_qb, "dqb_coords", copy.deepcopy(self.dqb_coords))
         setattr(new_qb, "log_x_corrections", copy.deepcopy(self.log_x_corrections))
         setattr(new_qb, "log_z_corrections", copy.deepcopy(self.log_z_corrections))
         setattr(new_qb, "logical_readouts", copy.deepcopy(self.logical_readouts))
@@ -402,128 +382,112 @@ class RotSurfCode(LogicalQubit):
 
         if self.stabilizers is None:
             stabs = []
-            anc_idx = (
-                self.dx * self.dz
-            )  # Index of the first ancilla qubit. The data qubits are indexed from 0 to dx*dz-1 and the ancilla qubits are indexed from dx*dz to dx*dz+num_anc-1
-
-            ## ZZZZ stabilizers
-            for row in range(self.dx - 1):
-                for col in range(self.dz - 1):
-                    if (row + col) % 2 == 1:
-                        pauli_str = "ZZZZ"
-                        stabs.append(
-                            Stabilizer(
-                                pauli_op=PauliOp(
-                                    pauli_string=pauli_str,
-                                    data_qubits=[
-                                        row * self.dz + col,
-                                        row * self.dz + col + 1,
-                                        (row + 1) * self.dz + col,
-                                        (row + 1) * self.dz + col + 1,
-                                    ],
-                                ),
-                                anc_qubits=[anc_idx],
-                            )
-                        )
-                        anc_idx += 1
-
-            ## ZZ stabilizers
-            for row in range(self.dx - 1):
-                if row % 2 == 0:
-                    stabs.append(
-                        Stabilizer(
-                            pauli_op=PauliOp(
-                                pauli_string="ZZ",
-                                data_qubits=[
-                                    row * self.dz,
-                                    (row + 1) * self.dz,
-                                ],
-                            ),
-                            anc_qubits=[anc_idx],
-                        )
-                    )
-                    anc_idx += 1
-                else:
-                    stabs.append(
-                        Stabilizer(
-                            pauli_op=PauliOp(
-                                pauli_string="ZZ",
-                                data_qubits=[
-                                    row * self.dz + self.dz - 1,
-                                    (row + 1) * self.dz + self.dz - 1,
-                                ],
-                            ),
-                            anc_qubits=[anc_idx],
-                        )
-                    )
-                    anc_idx += 1
 
             ## XXXX stabilizers
-            for row in range(self.dx - 1):
-                for col in range(self.dz - 1):
-                    if (row + col) % 2 == 0:
+            for row in range(self.dz - 1):
+                for col in range(self.dx - 1):
+                    if (row + col) % 2 == 1:
                         pauli_str = "XXXX"
                         stabs.append(
                             Stabilizer(
                                 pauli_op=PauliOp(
                                     pauli_string=pauli_str,
                                     data_qubits=[
-                                        row * self.dz + col,
-                                        row * self.dz + col + 1,
-                                        (row + 1) * self.dz + col,
-                                        (row + 1) * self.dz + col + 1,
+                                        (col, row, 0),
+                                        (col + 1, row, 0),
+                                        (col, row + 1, 0),
+                                        (col + 1, row + 1, 0),
                                     ],
                                 ),
-                                anc_qubits=[anc_idx],
+                                anc_qubits=[(col+1, row+1, 1)],
                             )
                         )
-                        anc_idx += 1
 
             ## XX stabilizers
-            for col in range(self.dz - 1):
-                if col % 2 == 1:
+            for row in range(self.dz - 1):
+                if row % 2 == 0:
                     stabs.append(
                         Stabilizer(
                             pauli_op=PauliOp(
                                 pauli_string="XX",
                                 data_qubits=[
-                                    col,
-                                    col + 1,
+                                    (0, row, 0),
+                                    (0, row + 1, 0),
                                 ],
                             ),
-                            anc_qubits=[anc_idx],
+                            anc_qubits=[(0, row+1, 1)],
                         )
                     )
-                    anc_idx += 1
                 else:
                     stabs.append(
                         Stabilizer(
                             pauli_op=PauliOp(
                                 pauli_string="XX",
                                 data_qubits=[
-                                    (self.dx - 1) * self.dz + col,
-                                    (self.dx - 1) * self.dz + col + 1,
+                                    (self.dx - 1, row, 0),
+                                    (self.dx - 1, row + 1, 0),
                                 ],
                             ),
-                            anc_qubits=[anc_idx],
+                            anc_qubits=[(self.dx, row+1, 1)],
                         )
                     )
-                    anc_idx += 1
 
-            dqb_coords = {}
-            for i in range(self.dx * self.dz):
-                dqb_coords[i] = (1 + i // self.dz, 1 + i % self.dz)
+            ## ZZZZ stabilizers
+            for row in range(self.dz - 1):
+                for col in range(self.dx - 1):
+                    if (row + col) % 2 == 0:
+                        pauli_str = "ZZZZ"
+                        stabs.append(
+                            Stabilizer(
+                                pauli_op=PauliOp(
+                                    pauli_string=pauli_str,
+                                    data_qubits=[
+                                        (col, row, 0),
+                                        (col + 1, row, 0),
+                                        (col, row + 1, 0),
+                                        (col + 1, row + 1, 0),
+                                    ],
+                                ),
+                                anc_qubits=[(col+1, row+1, 1)],
+                            )
+                        )
+
+            ## ZZ stabilizers
+            for col in range(self.dx - 1):
+                if col % 2 == 1:
+                    stabs.append(
+                        Stabilizer(
+                            pauli_op=PauliOp(
+                                pauli_string="ZZ",
+                                data_qubits=[
+                                    (col, 0, 0),
+                                    (col + 1, 0, 0),
+                                ],
+                            ),
+                            anc_qubits=[(col+1, 0, 1)],
+                        )
+                    )
+                else:
+                    stabs.append(
+                        Stabilizer(
+                            pauli_op=PauliOp(
+                                pauli_string="ZZ",
+                                data_qubits=[
+                                    (col, self.dz - 1, 0),
+                                    (col + 1, self.dz - 1, 0),
+                                ],
+                            ),
+                            anc_qubits=[(col+1, self.dz, 1)],
+                        )
+                    )
 
             self.stabilizers = stabs
-            self.dqb_coords = dqb_coords
             self.log_x = PauliOp(
                 pauli_string="X" * self.dx,
-                data_qubits=list(np.arange(self.dx) * self.dz),
+                data_qubits=[(i, 0, 0) for i in range(self.dx)]
             )
-            self.log_z = PauliOp(pauli_string="Z" * self.dz, data_qubits=range(self.dz))
-
-    def _get_qb_id_from_coords(self, row: int, col: int) -> int:
-        return row * self.dz + col
+            self.log_z = PauliOp(pauli_string="Z" * self.dz,
+                data_qubits=[(0, i, 0) for i in range(self.dz)])
 
     def get_def_log_op(self, basis: str) -> PauliOp:
         # Idea: Start at one logical corner (i.e. with Pauli charge Y) and move along
@@ -535,19 +499,21 @@ class RotSurfCode(LogicalQubit):
                 break
         current_qb = start_qb
         log_op_dqbs = [start_qb]
+        already_visited = [start_qb]
         completed = False
         while not completed:
-            for next_qb in self.get_neighbour_qbs(current_qb):
-                if next_qb in log_op_dqbs:
+            for next_qb in self.get_neighbour_dqbs(current_qb):
+                print(next_qb)
+                if next_qb in already_visited:
                     continue
 
                 if pauli_charges[next_qb] == "Y":
                     log_op_dqbs.append(next_qb)
-                    current_qb = next_qb
                     completed = True
                     break
                 elif pauli_charges[next_qb] == basis:
                     log_op_dqbs.append(next_qb)
+                    already_visited.append(next_qb)
                     current_qb = next_qb
                     break
 
@@ -560,48 +526,19 @@ class RotSurfCode(LogicalQubit):
         return self.get_def_log_op("Z")
 
     def split(
-        self, split_qbs: list[int], new_ids: tuple[str, str]
+        self, split_qbs: list[Qubit], new_ids: tuple[str, str]
     ) -> tuple[CircuitList, LogicalQubit, LogicalQubit, str]:
         threshold = 1e-3
 
-        def find_split_direction(dqb_coords, split_qbs) -> tuple[str, float]:
-            """Finds the direction of the split (either horizontal or vertical),
-            based on the coordinates of the split qubits and the coordinates of the
-            data qubits."""
-            split_direction_hor = True
-            split_direction_vert = True
-            for qb in split_qbs:
-                if dqb_coords[qb][0] != dqb_coords[split_qbs[0]][0]:
-                    split_direction_hor = False
-                if dqb_coords[qb][1] != dqb_coords[split_qbs[0]][1]:
-                    split_direction_vert = False
-
-            if split_direction_hor and split_direction_vert:
-                raise ValueError(
-                    "Split qubits must be either in the same row or in the same column."
-                )
-            elif not split_direction_hor and not split_direction_vert:
-                raise ValueError(
-                    "Split qubits must be either in the same row or in the same column."
-                )
-            elif split_direction_hor:
-                split_direction = "horizontal"
-                splitting_coord = dqb_coords[split_qbs[0]][0]
-            else:
-                split_direction = "vertical"
-                splitting_coord = dqb_coords[split_qbs[0]][1]
-
-            return split_direction, splitting_coord
-
-        def check_which_log_op_is_split(split_qbs, log_x, log_z) -> str:
+        def get_splitted_op(split_qbs: list[Qubit]) -> str:
             """Returns `X` if the logical X operator is split, `Z` if the logical Z
             operator is split."""
-            if len(set(split_qbs).intersection(set(log_x.data_qubits))) == 0:
+            if len(set(split_qbs).intersection(set(self.log_x.data_qubits))) == 0:
                 x_op_split = False  # The logical x operator is not split
             else:
                 x_op_split = True  # The logical x operator is split
 
-            if len(set(split_qbs).intersection(set(log_z.data_qubits))) == 0:
+            if len(set(split_qbs).intersection(set(self.log_z.data_qubits))) == 0:
                 z_op_split = False  # The logical z operator is not split
             else:
                 z_op_split = True  # The logical z operator is split
@@ -622,76 +559,132 @@ class RotSurfCode(LogicalQubit):
             else:
                 return "Z"
 
-        # Find the operator which is split into two parts (either X or Z)
-        split_operator = check_which_log_op_is_split(split_qbs, self.log_x, self.log_z)
+        def find_stabs_from_dqbs(dqbs: set[Qubit], splitted_op: str) -> list[Stabilizer]:
+            stabs = []
+            for stab in self.stabilizers:
+                intersection_qbs = set(stab.pauli_op.data_qubits) & dqbs
+                if set(stab.pauli_op.data_qubits) <= dqbs:
+                    stabs.append(stab)
+                elif len(intersection_qbs) == 2:
+                    # Now consider stabilizers which were weight-4 stabilizers before the split
+                    # but now there are only 2 qubits remaining in the new set.
+                    # Note that the case with only 1 qubit left are stabilizers which were
+                    # previously weight-2 stabilizers at the edge and one of the data qubits
+                    # was measured during the split. These stabilizers are discarded during
+                    # the split.
+                    if stab.pauli_op.pauli_string[0] != splitted_op:
+                        continue
+                    # This stabilizer has to be modified to exclude the measured split qubits
+                    new_pauli_str = ""
+                    new_data_qbs = []
+                    for i, dqb in enumerate(stab.pauli_op.data_qubits):
+                        if dqb in intersection_qbs:
+                            new_pauli_str += stab.pauli_op.pauli_string[i]
+                            new_data_qbs.append(dqb)
+                    new_stab = Stabilizer(
+                        pauli_op=PauliOp(
+                            pauli_string=new_pauli_str, data_qubits=new_data_qbs
+                        ),
+                        anc_qubits=stab.anc_qubits,
+                        reset=stab.reset,
+                    )
+                    stabs.append(new_stab)
+            return stabs
 
-        # Split up the stabilizers
-        split_direction, splitting_coord = find_split_direction(
-            self.get_dqb_coords(), split_qbs
+        def construct_new_log_qb(new_stabs, new_id, splitted_op: str):
+            dqbs_new = {
+                dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits
+            }
+            dqb_coords_new = {qb: self.circ.qb_coords[qb] for qb in dqbs_new}
+            new_dx = (
+                1
+                + max([dqb_coords_new[qb][0] for qb in dqbs_new])
+                - min([dqb_coords_new[qb][0] for qb in dqbs_new])
+            )
+            new_dz = (
+                1
+                + max([dqb_coords_new[qb][1] for qb in dqbs_new])
+                - min([dqb_coords_new[qb][1] for qb in dqbs_new])
+            )
+
+            new_log_qb = RotSurfCode(
+                new_id,
+                stabilizers=new_stabs,
+                dx=new_dx,
+                dz=new_dz,
+                circ=self.circ,  # Associate them with the same circuit
+            )
+
+            def get_log_op_intersection(op: PauliOp, dqb_set: list[Qubit]) -> PauliOp:
+                new_op_qbs = [
+                    qb
+                    for qb in op.data_qubits
+                    if qb in dqb_set
+                ]
+                new_op_paulis = [
+                    op.pauli_string[i]
+                    for i, qb in enumerate(op.data_qubits)
+                    if qb in dqb_set
+                ]
+                new_op_pauli_str = "".join(new_op_paulis)
+                return PauliOp(
+                    pauli_string=new_op_pauli_str, data_qubits=new_op_qbs
+                )
+
+            if splitted_op == "Z":
+                new_log_qb.log_z = get_log_op_intersection(self.log_z, dqbs_new)
+                new_log_qb.log_x = new_log_qb.get_def_log_x()
+            elif splitted_op == "X":
+                new_log_qb.log_x = get_log_op_intersection(self.log_x, dqbs_new)
+                new_log_qb.log_z = new_log_qb.get_def_log_z()
+
+            return new_log_qb
+
+        if not set(split_qbs) <= set(self._get_data_qubits()):
+            raise ValueError(f"The split qubits are not contained in the set of data qubits of this logical qubit. Split qubits: {split_qbs}")
+
+        dqbs_wo_split_qbs = set(self._get_data_qubits()) - set(split_qbs)
+        dqbs_log_qb1 = set(self.circ.get_connected_dqbs_in_set(list(dqbs_wo_split_qbs)[0], dqbs_wo_split_qbs))
+        # Check whether the two sets contain the same qubits (must be ==, cannot be is)
+        if dqbs_log_qb1 == dqbs_wo_split_qbs:
+            raise ValueError(f"The split qubits do not separate the logical qubit patch into two patches. Check again the list of split qubits and consider adding additional split qubits. Split qubits: {split_qbs}")
+
+        dqbs_log_qb2 = dqbs_wo_split_qbs - dqbs_log_qb1
+
+        splitted_op = get_splitted_op(split_qbs)
+        stabs_log_qb1 = find_stabs_from_dqbs(dqbs_log_qb1, splitted_op)
+        stabs_log_qb2 = find_stabs_from_dqbs(dqbs_log_qb2, splitted_op)
+        new_qb1 = construct_new_log_qb(stabs_log_qb1, new_ids[0], splitted_op)
+        new_qb2 = construct_new_log_qb(stabs_log_qb2, new_ids[1], splitted_op)
+        pprint.pp(new_qb1)
+        pprint.pp(new_qb2)
+
+        split_qbs_mmt_circ = []
+        if splitted_op == "X":
+            split_qbs_mmt_circ += [
+                ["H", split_qbs],
+            ]
+        split_qbs_mmt_circ += [
+            ["M", split_qbs],
+        ]
+        log_op_update_stabs1 = []
+        log_op_update_stabs2 = []
+
+        return (
+            split_qbs_mmt_circ,
+            new_qb1,
+            new_qb2,
+            splitted_op,
+            log_op_update_stabs1,
+            log_op_update_stabs2,
         )
 
-        def find_new_stabs(
-            coordinate_id: int,
-            stabilizers: list[Stabilizer],
-            dqb_coords,
-            check_condition,
-        ):
-            new_stabs = []
-            boundary_stabs = []
-            for stab in stabilizers:
-                num_dqbs_on_new_patch = 0  # Number of data qubits of this stabilizer which are on the left side of the split
-                for dqb in stab.pauli_op.data_qubits:
-                    if check_condition(dqb_coords[dqb][coordinate_id]):
-                        num_dqbs_on_new_patch += 1
-                if num_dqbs_on_new_patch == 0:
-                    new_stabs.append(stab)
-                elif num_dqbs_on_new_patch > 0 and num_dqbs_on_new_patch < len(
-                    stab.pauli_op.data_qubits
-                ):
-                    # The stabilizer lies in the boundary region of the split
-                    if set(stab.pauli_op.pauli_string) != set(split_operator):
-                        boundary_stabs.append(stab)
-                    else:
-                        # This stabilizer has to be modified to exclude the measured
-                        # split qubits
-                        new_pauli_str = ""
-                        new_data_qbs = []
-                        for i, dqb in enumerate(stab.pauli_op.data_qubits):
-                            if (
-                                abs(dqb_coords[dqb][coordinate_id] - splitting_coord)
-                                > threshold
-                            ):
-                                new_pauli_str += stab.pauli_op.pauli_string[i]
-                                new_data_qbs.append(dqb)
-                        new_stab = Stabilizer(
-                            pauli_op=PauliOp(
-                                pauli_string=new_pauli_str, data_qubits=new_data_qbs
-                            ),
-                            anc_qubits=stab.anc_qubits,
-                            reset=stab.reset,
-                        )
-                        new_stabs.append(new_stab)
-            return new_stabs, boundary_stabs
 
-        if split_direction == "horizontal":
-            new_stabs_left, boundary_stabs_left = find_new_stabs(
-                coordinate_id=0,
-                stabilizers=self.stabilizers,
-                dqb_coords=self.get_dqb_coords(),
-                check_condition=lambda x: x > splitting_coord - threshold,
-            )
-            new_stabs_right, boundary_stabs_right = find_new_stabs(
-                coordinate_id=0,
-                stabilizers=self.stabilizers,
-                dqb_coords=self.get_dqb_coords(),
-                check_condition=lambda x: x < splitting_coord + threshold,
-            )
-
-            def construct_new_log_qb(new_stabs, new_id):
+        def construct_new_log_qb(new_stabs, new_id):
                 dqbs_new = {
                     dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits
                 }
-                dqb_coords_new = {qb: self.get_dqb_coords()[qb] for qb in dqbs_new}
+                dqb_coords_new
                 new_dx = (
                     1
                     + max([dqb_coords_new[qb][0] for qb in dqbs_new])
@@ -708,7 +701,6 @@ class RotSurfCode(LogicalQubit):
                     stabilizers=new_stabs,
                     dx=new_dx,
                     dz=new_dz,
-                    dqb_coords=dqb_coords_new,
                     circ=self.circ,  # Associate them with the same circuit
                 )
 
@@ -802,10 +794,6 @@ class RotSurfCode(LogicalQubit):
 
                 return new_log_qb
 
-        else:  # Vertical split
-            print("Vertical split!")
-            pass
-
         new_qb1 = construct_new_log_qb(new_stabs_left, new_ids[0])
         new_qb2 = construct_new_log_qb(new_stabs_right, new_ids[1])
         log_op_update_stabs1 = []
@@ -817,23 +805,6 @@ class RotSurfCode(LogicalQubit):
             if list(set(stab.pauli_op.pauli_string))[0] != split_operator:
                 log_op_update_stabs2.append(self.stabilizers.index(stab))
 
-        split_qbs_mmt_circ = []
-        if split_operator == "X":
-            split_qbs_mmt_circ += [
-                ["H", split_qbs],
-            ]
-        split_qbs_mmt_circ += [
-            ["M", split_qbs],
-        ]
-
-        return (
-            split_qbs_mmt_circ,
-            new_qb1,
-            new_qb2,
-            split_operator,
-            log_op_update_stabs1,
-            log_op_update_stabs2,
-        )
 
     def shrink(
         self,
