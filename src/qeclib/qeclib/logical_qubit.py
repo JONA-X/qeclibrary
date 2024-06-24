@@ -380,6 +380,9 @@ class RotSurfCode(LogicalQubit):
             if self.dx is None or self.dz is None:
                 raise ValueError("Please specify either both dx and dz, or only d.")
 
+        if self.dx <= 2 or self.dz <= 2:
+            raise ValueError("The code distance must be at least 3 along both axes.")
+
         if self.stabilizers is None:
             stabs = []
 
@@ -493,10 +496,14 @@ class RotSurfCode(LogicalQubit):
         # Idea: Start at one logical corner (i.e. with Pauli charge Y) and move along
         # an X/Z boundary (specified by basis argument) until reaching another logical corner
         pauli_charges = self.get_pauli_charges()
+        start_qb = None
         for qb, charge in pauli_charges.items():
             if charge == "Y":
                 start_qb = qb
                 break
+        if start_qb is None:
+            raise RuntimeError(f"No logical corner with Pauli charge Y found. Pauli charges: {pauli_charges}")
+
         current_qb = start_qb
         log_op_dqbs = [start_qb]
         already_visited = [start_qb]
