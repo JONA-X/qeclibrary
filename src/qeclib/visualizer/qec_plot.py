@@ -163,7 +163,7 @@ class QECPlot:
             coords = [self.circ.dqb_coords[qb] for qb in stab.pauli_op.data_qubits]
             if len(coords) > 2:
                 s_coords = list(sort_points(coords))
-                s_coords.append(s_coords[-1])
+                s_coords.append(s_coords[0])
                 s_coords = np.array(s_coords)
                 self._fig.add_trace(
                     go.Scatter(
@@ -199,7 +199,7 @@ class QECPlot:
                         [coords[1][0], coords[1][1] + stab_size],
                         ]
                 s_coords = list(sort_points(s_coords))
-                s_coords.append(s_coords[-1])
+                s_coords.append(s_coords[0])
                 s_coords = np.array(s_coords)
                 self._fig.add_trace(
                     go.Scatter(
