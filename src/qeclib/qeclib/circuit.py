@@ -16,6 +16,7 @@ Qubit = tuple[int, ...]
 
 op_names: list[str] = [
     "R",
+    "RX",
     "X",
     "Y",
     "Z",
@@ -29,6 +30,7 @@ op_names: list[str] = [
 ]
 internal_op_to_stim_map: dict[str, str] = {
     "R": "R",
+    "RX": "RX",
     "X": "X",
     "Y": "Y",
     "Z": "Z",
@@ -43,19 +45,20 @@ internal_op_to_stim_map: dict[str, str] = {
     "DEPOLARIZE2": "DEPOLARIZE2",
 }
 
-internal_op_to_qasm_str_map: dict[str, str] = {
-    "R": "R",
-    "X": "X",
-    "Y": "Y",
-    "Z": "Z",
-    "H": "h",
-    "CX": "cnot",
-    "CY": "CY",
-    "CZ": "CZ",
-    "M": "M",
-    "MR": "MR",
-    "Barrier": "TICK",
-}
+# internal_op_to_qasm_str_map: dict[str, str] = {
+#     "R": "R",
+#     "RX": "RX",
+#     "X": "X",
+#     "Y": "Y",
+#     "Z": "Z",
+#     "H": "h",
+#     "CX": "cnot",
+#     "CY": "CY",
+#     "CZ": "CZ",
+#     "M": "M",
+#     "MR": "MR",
+#     "Barrier": "TICK",
+# }
 
 
 @dataclass()
@@ -332,6 +335,11 @@ class Circuit(ABC):
     def m_log_z(self, log_qb_id: str, label: str = "") -> str:
         return self.m_log(log_qb_id, "Z", label)
 
+    def measure_physical_qbs(self, qbs: list[Qubit], name: str = None) -> list:
+        self._circuit += [("M", qbs)]
+        m_id = self.add_mmt(len(qbs), name, None, "log_op", None)
+        return m_id
+
     def log_QST(
         self, log_qbs: list[str] = None, bases: list[str] = ["X", "Y", "Z"]
     ) -> list[tuple[str, "Circuit"]]:
@@ -462,7 +470,7 @@ class Circuit(ABC):
     ):
         self.log_qb_id_valid_check(log_qb_id)
 
-        grow_circ = self.log_qbs[log_qb_id].grow(num_rows, direction)
+        grow_circ = self.log_qbs[log_qb_id].grow(direction, num_rows)
         self._circuit += grow_circ
 
     def get_connected_dqbs_in_set(self, starting_qubit: Qubit, qubit_set: set[Qubit]) -> set[Qubit]:
