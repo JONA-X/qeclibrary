@@ -20,6 +20,29 @@ class PauliOp:
             str_repr += f"{self.pauli_string[i]}_{qb}"
         return str_repr
 
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, PauliOp):
+            self_sorted = self.by_qb_sorted_op()
+            other_sorted = other.by_qb_sorted_op()
+            return (
+                self_sorted.pauli_string == other_sorted.pauli_string
+                and self_sorted.data_qubits == other_sorted.data_qubits
+            )
+        else:
+            return NotImplemented
+
+    def by_qb_sorted_op(self) -> "PauliOp":
+        # Map coordinate tuples to string characters
+        tuple_to_char = {index: char for index, char in enumerate(self.pauli_string)}
+
+        # Sort the list of tuples (index + coordinates)
+        sorted_tuples = sorted(enumerate(self.data_qubits), key=lambda x: x[1])
+
+        # Reorder the string based on the sorted order of tuples
+        sorted_string = ''.join(tuple_to_char[index] for index, _ in sorted_tuples)
+
+        return PauliOp(sorted_string, [qb for _, qb in sorted_tuples])
+
     def get_latex_repr(self) -> str:
         str_repr = ""
         for i, qb in enumerate(self.data_qubits):
