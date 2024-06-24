@@ -811,3 +811,87 @@ class RotSurfCode(LogicalQubit):
                 self.log_z.data_qubits[i][1] + shift_vector[1],
                 0
             )
+
+    def grow(self, direction: str, num_row_cols: int):
+        boundary_qbs, boundary_type = self.get_boundary_qbs_and_type(direction)
+
+        new_qbs = [
+            self.circ.shift_qb_coords(q, direction, i)
+            for i in range(1, num_row_cols + 1)
+            for q in boundary_qbs
+        ]
+
+        if not all(
+            q[0] >= 0 and q[1] >= 0 and q[0] < self.circ.rows and q[1] < self.circ.cols
+            for q in new_qbs
+        ):
+            raise ValueError("New qubits are out of bounds")
+
+        # TODO: Add check that these data qubits are not contained in any other patches.
+
+        # Modify weight-2 stabilizers to include new qubits
+        for stab in self.stabilizers:
+            if set(stab.pauli_op.data_qubits).issubset(set(boundary_qbs)):
+                added_qbs = [
+                    self.circ.shift_qb_coords(q, direction, 1)
+                    for q in stab.pauli_op.data_qubits
+                ]
+                stab.pauli_op.data_qubits += added_qbs
+                stab.pauli_op.pauli_string += stab.pauli_op.pauli_string[0] * num_row_cols
+
+        # Add new stabilizers
+        if direction in ["l", "r"]:
+            new_dx = self.dx + num_row_cols
+            new_dz = self.dz
+        elif direction in ["t", "b"]:
+            new_dx = self.dx
+            new_dz = self.dz + num_row_cols
+
+        temp_Q1 = RotSurfCode(
+            id="temp",
+            dx=new_dx,
+            dz=new_dz,
+        )
+        temp_Q1.shift_coords(self.top_left_corner())
+        new_stabs = []
+        for stab in temp_Q1.stabilizers:
+            if stab not in self.stabilizers:
+                new_stabs.append(stab)
+
+        self.stabilizers += new_stabs
+
+        # Add new data qubits to the right logical operator
+        if direction in ["l", "r"]:
+            intersection_qb = set(boundary_qbs) & set(self.log_x.data_qubits)
+            if len(intersection_qb) != 1:
+                raise RuntimeError(f"Found {len(intersection_qb)} intersection qubits. Expected 1.")
+            new_qbs_in_log_op = [
+                self.circ.shift_qb_coords(list(intersection_qb)[0], direction, i)
+                for i in range(1, num_row_cols + 1)
+            ]
+            self.log_x.data_qubits += new_qbs_in_log_op
+            self.log_x.pauli_string += "X" * num_row_cols
+        elif direction in ["t", "b"]:
+            intersection_qb = set(boundary_qbs) & set(self.log_z.data_qubits)
+            if len(intersection_qb) != 1:
+                raise RuntimeError(f"Found {len(intersection_qb)} intersection qubits. Expected 1.")
+            new_qbs_in_log_op = [
+                self.circ.shift_qb_coords(list(intersection_qb)[0], direction, i)
+                for i in range(1, num_row_cols + 1)
+            ]
+            self.log_z.data_qubits += new_qbs_in_log_op
+            self.log_z.pauli_string += "Z" * num_row_cols
+
+        reset_operator = "RX" if boundary_type == "Z" else "R"
+        reset_operator_ancilla = "R" if boundary_type == "Z" else "RX"
+
+        circ_list = [
+            (reset_operator, new_qbs)
+        ]
+
+        # Reset new ancillas
+        for stab in new_stabs:
+            if stab.pauli_op.pauli_string[0] == boundary_type:
+                circ_list.append((reset_operator_ancilla, stab.anc_qubits))
+
+        return circ_list
