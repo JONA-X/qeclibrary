@@ -564,41 +564,29 @@ class SquareLattice(Circuit):
                     "Start position row is too large."
                 )
 
-            if (
+            if not (
                 logical_qubit.id not in self.log_qbs
                 or self.log_qbs[logical_qubit.id].exists is False
             ):
+                raise ValueError("Logical qubit already exists.")
+            else:
                 self.log_qbs[logical_qubit.id] = logical_qubit
                 logical_qubit.circ = self
-                for stab in logical_qubit.stabilizers:
-                    for i, qb in enumerate(stab.pauli_op.data_qubits):
-                        stab.pauli_op.data_qubits[i] = (
-                            stab.pauli_op.data_qubits[i][0] + start_pos[0],
-                            stab.pauli_op.data_qubits[i][1] + start_pos[1],
-                            0
-                        )
-                    for i, qb in enumerate(stab.anc_qubits):
-                        stab.anc_qubits[i] = (
-                            stab.anc_qubits[i][0] + start_pos[0],
-                            stab.anc_qubits[i][1] + start_pos[1],
-                            1
-                        )
-
-                for i, qb in enumerate(logical_qubit.log_x.data_qubits):
-                    logical_qubit.log_x.data_qubits[i] = (
-                        logical_qubit.log_x.data_qubits[i][0] + start_pos[0],
-                        logical_qubit.log_x.data_qubits[i][1] + start_pos[1],
-                        0
-                    )
-                for i, qb in enumerate(logical_qubit.log_z.data_qubits):
-                    logical_qubit.log_z.data_qubits[i] = (
-                        logical_qubit.log_z.data_qubits[i][0] + start_pos[0],
-                        logical_qubit.log_z.data_qubits[i][1] + start_pos[1],
-                        0
-                    )
-            else:
-                raise ValueError("Logical qubit already exists.")
+                logical_qubit.shift_coords(start_pos)
         else:
             raise NotImplementedError(
                 "Only RotSurfCode logical qubits are supported on the square lattice for now."
             )
+
+    def shift_qb_coords(self, coord, direction: str, n: int):
+        coord_copy = list(copy.deepcopy(coord)) # Make copy and change from tuple to list to allow modification
+        if direction == "r":
+            coord_copy[0] += n
+        elif direction == "l":
+            coord_copy[0] -= n
+        elif direction == "t":
+            coord_copy[1] -= n
+        elif direction == "b":
+            coord_copy[1] += n
+
+        return tuple(coord_copy)
