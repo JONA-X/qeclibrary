@@ -781,3 +781,33 @@ class RotSurfCode(LogicalQubit):
         boundary_pauli_charges = [charge for _, charge in self.get_pauli_charges_for_subset_of_qbs(boundary_qbs).items()]
         boundary_type = list(set(boundary_pauli_charges) - {"Y"})[0]
         return boundary_qbs, boundary_type
+
+    def top_left_corner(self) -> tuple[int, int]:
+        dqb_coords_array = np.array(list(self.get_dqb_coords().keys()))
+        return (np.min(dqb_coords_array[:,0]), np.min(dqb_coords_array[:,1]))
+
+    def shift_coords(self, shift_vector: tuple[int, int]) -> None:
+        for stab in self.stabilizers:
+            for i, _ in enumerate(stab.pauli_op.data_qubits):
+                old_coords = list(stab.pauli_op.data_qubits[i])
+                old_coords[0] += shift_vector[0]
+                old_coords[1] += shift_vector[1]
+                stab.pauli_op.data_qubits[i] = tuple(old_coords)
+            for i, _ in enumerate(stab.anc_qubits):
+                old_coords = list(stab.anc_qubits[i])
+                old_coords[0] += shift_vector[0]
+                old_coords[1] += shift_vector[1]
+                stab.anc_qubits[i] = tuple(old_coords)
+
+        for i, _ in enumerate(self.log_x.data_qubits):
+            self.log_x.data_qubits[i] = (
+                self.log_x.data_qubits[i][0] + shift_vector[0],
+                self.log_x.data_qubits[i][1] + shift_vector[1],
+                0
+            )
+        for i, _ in enumerate(self.log_z.data_qubits):
+            self.log_z.data_qubits[i] = (
+                self.log_z.data_qubits[i][0] + shift_vector[0],
+                self.log_z.data_qubits[i][1] + shift_vector[1],
+                0
+            )
