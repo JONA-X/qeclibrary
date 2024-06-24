@@ -305,15 +305,15 @@ class LogicalQubit(ABC):
         ]
         return m_circ
 
-    def get_pauli_charges(self):
-        pauli_charge_numbers = {}
+    def get_pauli_charges(self) -> dict[Qubit, str]:
+        pauli_charge_numbers = {
+            qb_id: {"X": 0, "Y": 0, "Z": 0}
+            for stab in self.stabilizers
+            for qb_id in stab.pauli_op.data_qubits
+        }
         for stab in self.stabilizers:
             for i, qb in enumerate(stab.pauli_op.data_qubits):
-                if qb in pauli_charge_numbers:
-                    pauli_charge_numbers[qb][stab.pauli_op.pauli_string[i]] += 1
-                else:
-                    pauli_charge_numbers[qb] = {"X": 0, "Y": 0, "Z": 0}
-                    pauli_charge_numbers[qb][stab.pauli_op.pauli_string[i]] = 1
+                pauli_charge_numbers[qb][stab.pauli_op.pauli_string[i]] += 1
 
         pauli_charges = {}
         for qb, charge in pauli_charge_numbers.items():
@@ -327,6 +327,10 @@ class LogicalQubit(ABC):
             else:
                 pauli_charges[qb] = "Z"
         return pauli_charges
+
+    def get_pauli_charges_for_subset_of_qbs(self, qbs: list[Qubit]) -> dict[Qubit, str]:
+        pauli_charges = self.get_pauli_charges()
+        return {qb: pauli_charges[qb] for qb in qbs}
 
     @abstractmethod
     def split(
@@ -755,3 +759,24 @@ class RotSurfCode(LogicalQubit):
             raise ValueError("Invalid direction. Must be in ['t', 'b', 'l', 'r']")
 
         return circuit_list
+
+    def get_boundary_type(self, direction: str) -> str:
+        if direction not in ["l", "r", "t", "b"]:
+            raise ValueError("`direction` must be one of 'l', 'r', 't', 'b'")
+
+        dqb_coords_dict = self.get_dqb_coords()
+        dqb_coords_array = np.array(list(dqb_coords_dict.keys()))
+        if direction in ["l", "r"]:
+            if direction == "r":
+                x = np.max(dqb_coords_array[:,0])
+            elif direction == "l":
+                x = np.min(dqb_coords_array[:,0])
+            boundary_qbs = [qb for qb in dqb_coords_dict.keys() if qb[0] == x]
+        elif direction in ["t", "b"]:
+            if direction == "t":
+                z = np.min(dqb_coords_array[:,1])
+            elif direction == "b":
+                z = np.max(dqb_coords_array[:,1])
+            boundary_qbs = [qb for qb in dqb_coords_dict.keys() if qb[1] == z]
+        boundary_pauli_charges = [charge for _, charge in self.get_pauli_charges_for_subset_of_qbs(boundary_qbs).items()]
+        return list(set(boundary_pauli_charges) - {"Y"})[0]
