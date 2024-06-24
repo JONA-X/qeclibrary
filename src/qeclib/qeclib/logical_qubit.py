@@ -760,7 +760,7 @@ class RotSurfCode(LogicalQubit):
 
         return circuit_list
 
-    def get_boundary_type(self, direction: str) -> str:
+    def get_boundary_qbs_and_type(self, direction: str) -> str:
         if direction not in ["l", "r", "t", "b"]:
             raise ValueError("`direction` must be one of 'l', 'r', 't', 'b'")
 
@@ -779,4 +779,5 @@ class RotSurfCode(LogicalQubit):
                 z = np.max(dqb_coords_array[:,1])
             boundary_qbs = [qb for qb in dqb_coords_dict.keys() if qb[1] == z]
         boundary_pauli_charges = [charge for _, charge in self.get_pauli_charges_for_subset_of_qbs(boundary_qbs).items()]
-        return list(set(boundary_pauli_charges) - {"Y"})[0]
+        boundary_type = list(set(boundary_pauli_charges) - {"Y"})[0]
+        return boundary_qbs, boundary_type
