@@ -10,6 +10,8 @@ import numpy as np
 from .logical_qubit import LogicalQubit, RotSurfCode
 from .noise_models import NoiseModel
 from .measurement import Measurement
+from .stabilizer_measurement import StabilizerMeasurement
+from .syndrome import Syndrome
 
 CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 Qubit = tuple[int, ...]
@@ -73,6 +75,10 @@ class Circuit(ABC):
     qb_coords: dict[Qubit, tuple[float, float]] | None = Field(
         default_factory=lambda: {}
     )  # Map from data qubit indices to coordinatess
+    _stabilizer_measurement_list: dict[str, dict[int, dict[str, StabilizerMeasurement]]] = Field(default_factory=lambda: {}) # First key: logical qubit. Second key: QEC cycle number.
+    _syndrome_list: dict[str, dict[int, dict[str, Syndrome]]] = Field(
+        default_factory=lambda: {}
+    )
 
     @abstractmethod
     def __deepcopy__(self, memo):
@@ -270,7 +276,46 @@ class Circuit(ABC):
             else:
                 m_label = None  # Pass None to the function, so that it will use the uuid as a label
             m_id = self.add_mmt(1, m_label, log_qb_id, "stabilizer", str(stab.pauli_op))
+            if stab.reset:
+                qec_cycle = self.log_qbs[log_qb_id].qec_cycle_counter
+
+                # Create empty dict for the logical qubit if it does not exist yet
+                if log_qb_id not in self._stabilizer_measurement_list.keys():
+                    self._stabilizer_measurement_list[log_qb_id] = {}
+
+                # Create empty list for the new QEC cycle
+                if qec_cycle not in self._stabilizer_measurement_list[log_qb_id].keys():
+                    self._stabilizer_measurement_list[log_qb_id][qec_cycle] = {}
+
+                # Add stabilizer measurement
+                new_stab_mmt = StabilizerMeasurement(
+                    log_qb_id = log_qb_id,
+                    qec_cycle = qec_cycle,
+                    mmt_uuids = [(m_id, 0)],
+                    stabilizer = stab.id
+                )
+                self._stabilizer_measurement_list[log_qb_id][qec_cycle][stab.id] = new_stab_mmt
+
+                if len(self._stabilizer_measurement_list[log_qb_id]) >= 2:
+                    if log_qb_id not in self._syndrome_list.keys():
+                        self._syndrome_list[log_qb_id] = {}
+
+                    if qec_cycle not in self._syndrome_list[log_qb_id].keys():
+                        self._syndrome_list[log_qb_id][qec_cycle] = {}
+
+                    old_stab_mmt = self._stabilizer_measurement_list[log_qb_id][qec_cycle - 1][stab.id]
+
+                    self._syndrome_list[log_qb_id][qec_cycle][stab.id] = Syndrome(
+                        log_qb_id = log_qb_id,
+                        qec_cycle = qec_cycle,
+                        stab_mmt_ids = [old_stab_mmt.id, new_stab_mmt.id],
+                        stabilizer = stab.id
+                    )
+            else:
+                raise NotADirectoryError("Syndrome measurements without reset are not supported yet.")
             uuids.append(m_id)
+
+        self.log_qbs[log_qb_id].qec_cycle_counter += 1
 
         return uuids
 
@@ -390,6 +435,38 @@ class Circuit(ABC):
         for corr in mmt_tuple[1]:
             val += self.dict_m_uuids_to_res(measurements)[corr[0]][corr[1]]
         return val % 2
+
+    def get_stab_mmt(self, log_qb_id, id):
+        all_stab_mmts = [
+            stab_mmt
+            for i in range(len(self._stabilizer_measurement_list[log_qb_id]))
+            for stab_mmt in list(self._stabilizer_measurement_list[log_qb_id][i].values())
+        ]
+        stab_mmt = [mmt for mmt in all_stab_mmts if mmt.id == id]
+        if len(stab_mmt) != 1:
+            raise RuntimeError(f"Stabilizer measurement with id {id} not found.")
+        return stab_mmt[0]
+
+    def get_syndrome_values(self, measurements) -> dict:
+        mmt_dict = self.dict_m_uuids_to_res(measurements)
+        syndrome_dict = {
+            log_qb_id: {
+                qec_cycle: {}
+                for qec_cycle in self._syndrome_list[log_qb_id].keys()
+            }
+            for log_qb_id in self._syndrome_list.keys()
+        }
+        for log_qb_id in self._syndrome_list.keys():
+            for qec_cycle in self._syndrome_list[log_qb_id].keys():
+                for stab_id, syndrome in self._syndrome_list[log_qb_id][qec_cycle].items():
+                    stab_mmts = [
+                        mmt_dict[mmt[0]][mmt[1]]
+                        for stab_mmt in syndrome.stab_mmt_ids
+                        for mmt in self.get_stab_mmt(log_qb_id, stab_mmt).mmt_uuids
+                    ]
+                    syndrome_dict[log_qb_id][qec_cycle][stab_id] = np.sum(stab_mmts) % 2
+
+        return syndrome_dict
 
     def split(
         self,

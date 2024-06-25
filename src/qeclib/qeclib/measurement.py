@@ -10,7 +10,7 @@ class Measurement:
     number_of_mmts: int
     label: str
     log_qb_id: str | None
-    uuid: str | None = Field(default_factory=lambda: str(uuid.uuid4()))
+    uuid: str = Field(default_factory=lambda: str(uuid.uuid4()))
     type: Literal["stabilizer", "log_op", "shrink", "split", "other"] | None = (
         "other"
     )

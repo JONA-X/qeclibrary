@@ -1,8 +1,9 @@
+from pydantic import Field
 from pydantic.dataclasses import dataclass
+import uuid
 
 from .pauli_op import PauliOp
 
-CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 Qubit = tuple[int, ...]
 
 
@@ -15,3 +16,4 @@ class Stabilizer:
     reset: str | None = (
         "reset"  # Whether the ancilla is reset after measurement. Allowed values "reset" or "none". In the future also "conditional" should be supported
     )
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))

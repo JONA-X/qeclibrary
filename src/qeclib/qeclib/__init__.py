@@ -4,6 +4,8 @@ from .logical_qubit import *
 from .circuit import *
 from .pauli_op import *
 from .stabilizer import *
+from .stabilizer_measurement import StabilizerMeasurement
+from .syndrome import Syndrome
 from .utilities import *
 from .circ_utilities import *
 from visualizer import *

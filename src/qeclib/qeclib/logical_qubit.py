@@ -40,6 +40,7 @@ class LogicalQubit(ABC):
         init=False,
     )
     circ: object = None
+    qec_cycle_counter: int = 0 # Just for annotation purposes
 
     def __post_init__(self) -> None:
         self._check_correctness()
