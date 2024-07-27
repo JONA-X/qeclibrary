@@ -13,6 +13,7 @@ CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 Qubit = tuple[int, ...]
 import pprint
 
+
 @dataclass()
 class LogicalQubit(ABC):
     """Class representing one logical qubit on a code patch.
@@ -40,7 +41,7 @@ class LogicalQubit(ABC):
         init=False,
     )
     circ: object = None
-    qec_cycle_counter: int = 0 # Just for annotation purposes
+    qec_cycle_counter: int = 0  # Just for annotation purposes
 
     def __post_init__(self) -> None:
         self._check_correctness()
@@ -142,7 +143,9 @@ class LogicalQubit(ABC):
         return {index: self.circ.qb_coords[index] for index in self._get_data_qubits()}
 
     def get_aqb_coords(self) -> dict[int, tuple[float, float]]:
-        return {index: self.circ.qb_coords[index] for index in self._get_ancilla_qubits()}
+        return {
+            index: self.circ.qb_coords[index] for index in self._get_ancilla_qubits()
+        }
 
     def x(self) -> CircuitList:
         circuit_list = []
@@ -407,7 +410,7 @@ class RotSurfCode(LogicalQubit):
                                         (col + 1, row + 1, 0),
                                     ],
                                 ),
-                                anc_qubits=[(col+1, row+1, 1)],
+                                anc_qubits=[(col + 1, row + 1, 1)],
                             )
                         )
 
@@ -423,7 +426,7 @@ class RotSurfCode(LogicalQubit):
                                     (0, row + 1, 0),
                                 ],
                             ),
-                            anc_qubits=[(0, row+1, 1)],
+                            anc_qubits=[(0, row + 1, 1)],
                         )
                     )
                 else:
@@ -436,7 +439,7 @@ class RotSurfCode(LogicalQubit):
                                     (self.dx - 1, row + 1, 0),
                                 ],
                             ),
-                            anc_qubits=[(self.dx, row+1, 1)],
+                            anc_qubits=[(self.dx, row + 1, 1)],
                         )
                     )
 
@@ -456,7 +459,7 @@ class RotSurfCode(LogicalQubit):
                                         (col + 1, row + 1, 0),
                                     ],
                                 ),
-                                anc_qubits=[(col+1, row+1, 1)],
+                                anc_qubits=[(col + 1, row + 1, 1)],
                             )
                         )
 
@@ -472,7 +475,7 @@ class RotSurfCode(LogicalQubit):
                                     (col + 1, 0, 0),
                                 ],
                             ),
-                            anc_qubits=[(col+1, 0, 1)],
+                            anc_qubits=[(col + 1, 0, 1)],
                         )
                     )
                 else:
@@ -485,17 +488,19 @@ class RotSurfCode(LogicalQubit):
                                     (col + 1, self.dz - 1, 0),
                                 ],
                             ),
-                            anc_qubits=[(col+1, self.dz, 1)],
+                            anc_qubits=[(col + 1, self.dz, 1)],
                         )
                     )
 
             self.stabilizers = stabs
             self.log_x = PauliOp(
                 pauli_string="X" * self.dx,
-                data_qubits=[(i, 0, 0) for i in range(self.dx)]
+                data_qubits=[(i, 0, 0) for i in range(self.dx)],
             )
-            self.log_z = PauliOp(pauli_string="Z" * self.dz,
-                data_qubits=[(0, i, 0) for i in range(self.dz)])
+            self.log_z = PauliOp(
+                pauli_string="Z" * self.dz,
+                data_qubits=[(0, i, 0) for i in range(self.dz)],
+            )
 
     def get_def_log_op(self, basis: str) -> PauliOp:
         # Idea: Start at one logical corner (i.e. with Pauli charge Y) and move along
@@ -507,7 +512,9 @@ class RotSurfCode(LogicalQubit):
                 start_qb = qb
                 break
         if start_qb is None:
-            raise RuntimeError(f"No logical corner with Pauli charge Y found. Pauli charges: {pauli_charges}")
+            raise RuntimeError(
+                f"No logical corner with Pauli charge Y found. Pauli charges: {pauli_charges}"
+            )
 
         current_qb = start_qb
         log_op_dqbs = [start_qb]
@@ -536,12 +543,20 @@ class RotSurfCode(LogicalQubit):
     def get_def_log_z(self) -> PauliOp:
         return self.get_def_log_op("Z")
 
-    def split_qbs_along_op(self, split_qbs: list[Qubit]) -> tuple[set[Qubit], set[Qubit]]:
+    def split_qbs_along_op(
+        self, split_qbs: list[Qubit]
+    ) -> tuple[set[Qubit], set[Qubit]]:
         dqbs_wo_split_qbs = set(self._get_data_qubits()) - set(split_qbs)
-        dqbs_set1 = set(self.circ.get_connected_dqbs_in_set(list(dqbs_wo_split_qbs)[0], dqbs_wo_split_qbs))
+        dqbs_set1 = set(
+            self.circ.get_connected_dqbs_in_set(
+                list(dqbs_wo_split_qbs)[0], dqbs_wo_split_qbs
+            )
+        )
         # Check whether the two sets contain the same qubits (must be ==, cannot be is)
         if dqbs_set1 == dqbs_wo_split_qbs:
-            raise ValueError(f"The split qubits do not separate the logical qubit patch into two patches. Check again the list of split qubits and consider adding additional split qubits. Split qubits: {split_qbs}")
+            raise ValueError(
+                f"The split qubits do not separate the logical qubit patch into two patches. Check again the list of split qubits and consider adding additional split qubits. Split qubits: {split_qbs}"
+            )
 
         dqbs_set2 = dqbs_wo_split_qbs - dqbs_set1
         return dqbs_set1, dqbs_set2
@@ -601,7 +616,9 @@ class RotSurfCode(LogicalQubit):
             else:
                 return "Z"
 
-        def find_stabs_from_dqbs(dqbs: set[Qubit], splitted_op: str) -> list[Stabilizer]:
+        def find_stabs_from_dqbs(
+            dqbs: set[Qubit], splitted_op: str
+        ) -> list[Stabilizer]:
             stabs = []
             for stab in self.stabilizers:
                 intersection_qbs = set(stab.pauli_op.data_qubits) & dqbs
@@ -634,9 +651,7 @@ class RotSurfCode(LogicalQubit):
             return stabs
 
         def construct_new_log_qb(new_stabs, new_id, splitted_op: str):
-            dqbs_new = {
-                dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits
-            }
+            dqbs_new = {dqb for stab in new_stabs for dqb in stab.pauli_op.data_qubits}
             dqb_coords_new = {qb: self.circ.qb_coords[qb] for qb in dqbs_new}
             new_dx = (
                 1
@@ -658,52 +673,64 @@ class RotSurfCode(LogicalQubit):
             )
 
             def get_log_op_intersection(op: PauliOp, dqb_set: list[Qubit]) -> PauliOp:
-                new_op_qbs = [
-                    qb
-                    for qb in op.data_qubits
-                    if qb in dqb_set
-                ]
+                new_op_qbs = [qb for qb in op.data_qubits if qb in dqb_set]
                 new_op_paulis = [
                     op.pauli_string[i]
                     for i, qb in enumerate(op.data_qubits)
                     if qb in dqb_set
                 ]
                 new_op_pauli_str = "".join(new_op_paulis)
-                return PauliOp(
-                    pauli_string=new_op_pauli_str, data_qubits=new_op_qbs
-                )
+                return PauliOp(pauli_string=new_op_pauli_str, data_qubits=new_op_qbs)
 
             if splitted_op == "Z":
                 new_log_qb.log_z = get_log_op_intersection(self.log_z, dqbs_new)
                 new_log_qb.log_x = new_log_qb.get_def_log_x()
                 qbs_between = self.get_qbs_between_two_ops(new_log_qb.log_x, self.log_x)
-                qbs_between_incl_ops = list(qbs_between) + new_log_qb.log_x.data_qubits + self.log_x.data_qubits
+                qbs_between_incl_ops = (
+                    list(qbs_between)
+                    + new_log_qb.log_x.data_qubits
+                    + self.log_x.data_qubits
+                )
             elif splitted_op == "X":
                 new_log_qb.log_x = get_log_op_intersection(self.log_x, dqbs_new)
                 new_log_qb.log_z = new_log_qb.get_def_log_z()
                 qbs_between = self.get_qbs_between_two_ops(new_log_qb.log_z, self.log_z)
-                qbs_between_incl_ops = list(qbs_between) + new_log_qb.log_z.data_qubits + self.log_z.data_qubits
+                qbs_between_incl_ops = (
+                    list(qbs_between)
+                    + new_log_qb.log_z.data_qubits
+                    + self.log_z.data_qubits
+                )
 
             stabs_for_correction = []
             for stab in self.stabilizers:
-                if len(set(stab.pauli_op.data_qubits) & set(qbs_between_incl_ops)) == len(set(stab.pauli_op.data_qubits)) and stab.pauli_op.pauli_string[0] != splitted_op:
+                if (
+                    len(set(stab.pauli_op.data_qubits) & set(qbs_between_incl_ops))
+                    == len(set(stab.pauli_op.data_qubits))
+                    and stab.pauli_op.pauli_string[0] != splitted_op
+                ):
                     stabs_for_correction.append(stab)
             log_op_update = []
             for stab in stabs_for_correction:
-                    log_op_update.append(self.stabilizers.index(stab))
+                log_op_update.append(self.stabilizers.index(stab))
 
             return new_log_qb, log_op_update
 
         if not set(split_qbs) <= set(self._get_data_qubits()):
-            raise ValueError(f"The split qubits are not contained in the set of data qubits of this logical qubit. Split qubits: {split_qbs}")
+            raise ValueError(
+                f"The split qubits are not contained in the set of data qubits of this logical qubit. Split qubits: {split_qbs}"
+            )
 
         dqbs_log_qb1, dqbs_log_qb2 = self.split_qbs_along_op(split_qbs)
 
         splitted_op = get_splitted_op(split_qbs)
         stabs_log_qb1 = find_stabs_from_dqbs(dqbs_log_qb1, splitted_op)
         stabs_log_qb2 = find_stabs_from_dqbs(dqbs_log_qb2, splitted_op)
-        new_qb1, new_qb1_log_op_update = construct_new_log_qb(stabs_log_qb1, new_ids[0], splitted_op)
-        new_qb2, new_qb2_log_op_update = construct_new_log_qb(stabs_log_qb2, new_ids[1], splitted_op)
+        new_qb1, new_qb1_log_op_update = construct_new_log_qb(
+            stabs_log_qb1, new_ids[0], splitted_op
+        )
+        new_qb2, new_qb2_log_op_update = construct_new_log_qb(
+            stabs_log_qb2, new_ids[1], splitted_op
+        )
 
         split_qbs_mmt_circ = []
         if splitted_op == "X":
@@ -769,23 +796,28 @@ class RotSurfCode(LogicalQubit):
         dqb_coords_array = np.array(list(dqb_coords_dict.keys()))
         if direction in ["l", "r"]:
             if direction == "r":
-                x = np.max(dqb_coords_array[:,0])
+                x = np.max(dqb_coords_array[:, 0])
             elif direction == "l":
-                x = np.min(dqb_coords_array[:,0])
+                x = np.min(dqb_coords_array[:, 0])
             boundary_qbs = [qb for qb in dqb_coords_dict.keys() if qb[0] == x]
         elif direction in ["t", "b"]:
             if direction == "t":
-                z = np.min(dqb_coords_array[:,1])
+                z = np.min(dqb_coords_array[:, 1])
             elif direction == "b":
-                z = np.max(dqb_coords_array[:,1])
+                z = np.max(dqb_coords_array[:, 1])
             boundary_qbs = [qb for qb in dqb_coords_dict.keys() if qb[1] == z]
-        boundary_pauli_charges = [charge for _, charge in self.get_pauli_charges_for_subset_of_qbs(boundary_qbs).items()]
+        boundary_pauli_charges = [
+            charge
+            for _, charge in self.get_pauli_charges_for_subset_of_qbs(
+                boundary_qbs
+            ).items()
+        ]
         boundary_type = list(set(boundary_pauli_charges) - {"Y"})[0]
         return boundary_qbs, boundary_type
 
     def top_left_corner(self) -> tuple[int, int]:
         dqb_coords_array = np.array(list(self.get_dqb_coords().keys()))
-        return (np.min(dqb_coords_array[:,0]), np.min(dqb_coords_array[:,1]))
+        return (np.min(dqb_coords_array[:, 0]), np.min(dqb_coords_array[:, 1]))
 
     def shift_coords(self, shift_vector: tuple[int, int]) -> None:
         for stab in self.stabilizers:
@@ -804,13 +836,13 @@ class RotSurfCode(LogicalQubit):
             self.log_x.data_qubits[i] = (
                 self.log_x.data_qubits[i][0] + shift_vector[0],
                 self.log_x.data_qubits[i][1] + shift_vector[1],
-                0
+                0,
             )
         for i, _ in enumerate(self.log_z.data_qubits):
             self.log_z.data_qubits[i] = (
                 self.log_z.data_qubits[i][0] + shift_vector[0],
                 self.log_z.data_qubits[i][1] + shift_vector[1],
-                0
+                0,
             )
 
     def grow(self, direction: str, num_row_cols: int):
@@ -838,7 +870,9 @@ class RotSurfCode(LogicalQubit):
                     for q in stab.pauli_op.data_qubits
                 ]
                 stab.pauli_op.data_qubits += added_qbs
-                stab.pauli_op.pauli_string += stab.pauli_op.pauli_string[0] * num_row_cols
+                stab.pauli_op.pauli_string += (
+                    stab.pauli_op.pauli_string[0] * num_row_cols
+                )
 
         # Add new stabilizers
         if direction in ["l", "r"]:
@@ -865,7 +899,9 @@ class RotSurfCode(LogicalQubit):
         if direction in ["l", "r"]:
             intersection_qb = set(boundary_qbs) & set(self.log_x.data_qubits)
             if len(intersection_qb) != 1:
-                raise RuntimeError(f"Found {len(intersection_qb)} intersection qubits. Expected 1.")
+                raise RuntimeError(
+                    f"Found {len(intersection_qb)} intersection qubits. Expected 1."
+                )
             new_qbs_in_log_op = [
                 self.circ.shift_qb_coords(list(intersection_qb)[0], direction, i)
                 for i in range(1, num_row_cols + 1)
@@ -875,7 +911,9 @@ class RotSurfCode(LogicalQubit):
         elif direction in ["t", "b"]:
             intersection_qb = set(boundary_qbs) & set(self.log_z.data_qubits)
             if len(intersection_qb) != 1:
-                raise RuntimeError(f"Found {len(intersection_qb)} intersection qubits. Expected 1.")
+                raise RuntimeError(
+                    f"Found {len(intersection_qb)} intersection qubits. Expected 1."
+                )
             new_qbs_in_log_op = [
                 self.circ.shift_qb_coords(list(intersection_qb)[0], direction, i)
                 for i in range(1, num_row_cols + 1)
@@ -886,9 +924,7 @@ class RotSurfCode(LogicalQubit):
         reset_operator = "RX" if boundary_type == "Z" else "R"
         reset_operator_ancilla = "R" if boundary_type == "Z" else "RX"
 
-        circ_list = [
-            (reset_operator, new_qbs)
-        ]
+        circ_list = [(reset_operator, new_qbs)]
 
         # Reset new ancillas
         for stab in new_stabs:

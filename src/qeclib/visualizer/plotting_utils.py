@@ -10,6 +10,7 @@ def sort_points(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     sorted_points = np.array(sorted(points_w_angle, key=lambda x: x[-1]))
     return sorted_points[:, 0:-1]  # Remove the angle column
 
+
 def hex_to_rgb(hex_color: str) -> list[int]:
     if hex_color[0] == "#":
         hex_color = hex_color[1:]

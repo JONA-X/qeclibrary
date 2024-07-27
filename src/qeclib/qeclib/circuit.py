@@ -75,7 +75,11 @@ class Circuit(ABC):
     qb_coords: dict[Qubit, tuple[float, float]] | None = Field(
         default_factory=lambda: {}
     )  # Map from data qubit indices to coordinatess
-    _stabilizer_measurement_list: dict[str, dict[int, dict[str, StabilizerMeasurement]]] = Field(default_factory=lambda: {}) # First key: logical qubit. Second key: QEC cycle number.
+    _stabilizer_measurement_list: dict[
+        str, dict[int, dict[str, StabilizerMeasurement]]
+    ] = Field(
+        default_factory=lambda: {}
+    )  # First key: logical qubit. Second key: QEC cycle number.
     _syndrome_list: dict[str, dict[int, dict[str, Syndrome]]] = Field(
         default_factory=lambda: {}
     )
@@ -205,7 +209,9 @@ class Circuit(ABC):
         stim_circ = ""
         # Define coordinates of logical qubits
         for id, coords in self.qb_coords.items():
-            stim_circ += f"QUBIT_COORDS({coords[0]}, {coords[1]}) {dqb_keys.index(id)}\n"
+            stim_circ += (
+                f"QUBIT_COORDS({coords[0]}, {coords[1]}) {dqb_keys.index(id)}\n"
+            )
 
         if noise_model is None:
             operation_list = self._circuit
@@ -289,12 +295,14 @@ class Circuit(ABC):
 
                 # Add stabilizer measurement
                 new_stab_mmt = StabilizerMeasurement(
-                    log_qb_id = log_qb_id,
-                    qec_cycle = qec_cycle,
-                    mmt_uuids = [(m_id, 0)],
-                    stabilizer = stab.id
+                    log_qb_id=log_qb_id,
+                    qec_cycle=qec_cycle,
+                    mmt_uuids=[(m_id, 0)],
+                    stabilizer=stab.id,
                 )
-                self._stabilizer_measurement_list[log_qb_id][qec_cycle][stab.id] = new_stab_mmt
+                self._stabilizer_measurement_list[log_qb_id][qec_cycle][
+                    stab.id
+                ] = new_stab_mmt
 
                 if len(self._stabilizer_measurement_list[log_qb_id]) >= 2:
                     if log_qb_id not in self._syndrome_list.keys():
@@ -303,16 +311,20 @@ class Circuit(ABC):
                     if qec_cycle not in self._syndrome_list[log_qb_id].keys():
                         self._syndrome_list[log_qb_id][qec_cycle] = {}
 
-                    old_stab_mmt = self._stabilizer_measurement_list[log_qb_id][qec_cycle - 1][stab.id]
+                    old_stab_mmt = self._stabilizer_measurement_list[log_qb_id][
+                        qec_cycle - 1
+                    ][stab.id]
 
                     self._syndrome_list[log_qb_id][qec_cycle][stab.id] = Syndrome(
-                        log_qb_id = log_qb_id,
-                        qec_cycle = qec_cycle,
-                        stab_mmt_ids = [old_stab_mmt.id, new_stab_mmt.id],
-                        stabilizer = stab.id
+                        log_qb_id=log_qb_id,
+                        qec_cycle=qec_cycle,
+                        stab_mmt_ids=[old_stab_mmt.id, new_stab_mmt.id],
+                        stabilizer=stab.id,
                     )
             else:
-                raise NotADirectoryError("Syndrome measurements without reset are not supported yet.")
+                raise NotADirectoryError(
+                    "Syndrome measurements without reset are not supported yet."
+                )
             uuids.append(m_id)
 
         self.log_qbs[log_qb_id].qec_cycle_counter += 1
@@ -440,7 +452,9 @@ class Circuit(ABC):
         all_stab_mmts = [
             stab_mmt
             for i in range(len(self._stabilizer_measurement_list[log_qb_id]))
-            for stab_mmt in list(self._stabilizer_measurement_list[log_qb_id][i].values())
+            for stab_mmt in list(
+                self._stabilizer_measurement_list[log_qb_id][i].values()
+            )
         ]
         stab_mmt = [mmt for mmt in all_stab_mmts if mmt.id == id]
         if len(stab_mmt) != 1:
@@ -451,14 +465,15 @@ class Circuit(ABC):
         mmt_dict = self.dict_m_uuids_to_res(measurements)
         syndrome_dict = {
             log_qb_id: {
-                qec_cycle: {}
-                for qec_cycle in self._syndrome_list[log_qb_id].keys()
+                qec_cycle: {} for qec_cycle in self._syndrome_list[log_qb_id].keys()
             }
             for log_qb_id in self._syndrome_list.keys()
         }
         for log_qb_id in self._syndrome_list.keys():
             for qec_cycle in self._syndrome_list[log_qb_id].keys():
-                for stab_id, syndrome in self._syndrome_list[log_qb_id][qec_cycle].items():
+                for stab_id, syndrome in self._syndrome_list[log_qb_id][
+                    qec_cycle
+                ].items():
                     stab_mmts = [
                         mmt_dict[mmt[0]][mmt[1]]
                         for stab_mmt in syndrome.stab_mmt_ids
@@ -550,7 +565,9 @@ class Circuit(ABC):
         grow_circ = self.log_qbs[log_qb_id].grow(direction, num_rows)
         self._circuit += grow_circ
 
-    def get_connected_dqbs_in_set(self, starting_qubit: Qubit, qubit_set: set[Qubit]) -> set[Qubit]:
+    def get_connected_dqbs_in_set(
+        self, starting_qubit: Qubit, qubit_set: set[Qubit]
+    ) -> set[Qubit]:
         queue = [starting_qubit]
         neighbors = []
         while len(queue) > 0:
@@ -560,7 +577,7 @@ class Circuit(ABC):
                     (next_qb not in neighbors)
                     and (next_qb in qubit_set)
                     and next_qb is not starting_qubit
-                    ):
+                ):
                     neighbors.append(next_qb)
                     queue.append(next_qb)
         return neighbors
@@ -588,9 +605,9 @@ class SquareLattice(Circuit):
                 self.qb_coords[(c, r, 0)] = (c, r)
 
         # Ancilla qubits
-        for r in range(self.rows+1):
-            for c in range(self.cols+1):
-                self.qb_coords[(c, r, 1)] = (c - 0.5, r - 0.5) # Ancilla qubit
+        for r in range(self.rows + 1):
+            for c in range(self.cols + 1):
+                self.qb_coords[(c, r, 1)] = (c - 0.5, r - 0.5)  # Ancilla qubit
 
     def __deepcopy__(self, memo):
         new_circ = SquareLattice(name=self.name, rows=self.rows, cols=self.cols)
@@ -606,11 +623,15 @@ class SquareLattice(Circuit):
 
     @property
     def dqb_coords(self):
-        return {index: coords for index, coords in self.qb_coords.items() if index[2] == 0}
+        return {
+            index: coords for index, coords in self.qb_coords.items() if index[2] == 0
+        }
 
     @property
     def aqb_coords(self):
-        return {index: coords for index, coords in self.qb_coords.items() if index[2] == 1}
+        return {
+            index: coords for index, coords in self.qb_coords.items() if index[2] == 1
+        }
 
     def get_qb_coords(self, qb: Qubit) -> tuple[float, float]:
         if qb not in self.qb_coords:
@@ -641,13 +662,9 @@ class SquareLattice(Circuit):
                     "Start position coordinates must be larger or equal to 1."
                 )
             if start_pos[0] + logical_qubit.dx > self.cols:
-                raise ValueError(
-                    "Start position column is too large."
-                )
+                raise ValueError("Start position column is too large.")
             if start_pos[1] + logical_qubit.dz > self.rows:
-                raise ValueError(
-                    "Start position row is too large."
-                )
+                raise ValueError("Start position row is too large.")
 
             if not (
                 logical_qubit.id not in self.log_qbs
@@ -664,7 +681,9 @@ class SquareLattice(Circuit):
             )
 
     def shift_qb_coords(self, coord, direction: str, n: int):
-        coord_copy = list(copy.deepcopy(coord)) # Make copy and change from tuple to list to allow modification
+        coord_copy = list(
+            copy.deepcopy(coord)
+        )  # Make copy and change from tuple to list to allow modification
         if direction == "r":
             coord_copy[0] += n
         elif direction == "l":
