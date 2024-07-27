@@ -11,9 +11,9 @@ from .plotting_utils import sort_points, hex_to_rgb
 @dataclass()
 class QECPlot:
     circ: Circuit = None
-    show_grid: bool = True # TODO Cahnge
-    x_axis_visible: bool = True # TODO Cahnge
-    y_axis_visible: bool = True # TODO Cahnge
+    show_grid: bool = True  # TODO Cahnge
+    x_axis_visible: bool = True  # TODO Cahnge
+    y_axis_visible: bool = True  # TODO Cahnge
     width: int = 1100
     height: int = 700
     _log_qb_counter: int = (
@@ -63,7 +63,7 @@ class QECPlot:
             self.add_dqubits(
                 self.circ.dqb_coords.keys(),
                 color="gray",
-                number_inside_marker=True, # TODO Change back to false
+                number_inside_marker=True,  # TODO Change back to false
                 name="Data qubits",
                 showlegend=True,
                 legendgroup="qpu_dqbs",
@@ -71,7 +71,7 @@ class QECPlot:
             self.add_dqubits(
                 self.circ.aqb_coords.keys(),
                 color="lightgray",
-                number_inside_marker=True,# TODO Change back to false
+                number_inside_marker=True,  # TODO Change back to false
                 marker_size=15,
                 name="Ancilla qubits",
                 showlegend=True,
@@ -160,6 +160,11 @@ class QECPlot:
                 color = self._colors_XYZ["Z"]
             color = "rgba(" + ",".join(map(str, hex_to_rgb(color))) + ",0.8)"
 
+            stab_hover_text = "".join(
+                f"{stab.pauli_op.pauli_string[i]}<sub>{qb}</sub>"
+                for i, qb in enumerate(stab.pauli_op.data_qubits)
+            )
+
             coords = [self.circ.dqb_coords[qb] for qb in stab.pauli_op.data_qubits]
             if len(coords) > 2:
                 s_coords = list(sort_points(coords))
@@ -177,7 +182,8 @@ class QECPlot:
                             color="black",
                             width=2,
                         ),
-                        hoverinfo="none",
+                        text=stab_hover_text,
+                        hoverinfo="text",
                         legendgroup=f"stabs_{legend_qb}",
                         showlegend=i == 0,
                     )
@@ -190,14 +196,14 @@ class QECPlot:
                         [coords[0][0] + stab_size, coords[0][1]],
                         [coords[1][0] - stab_size, coords[1][1]],
                         [coords[1][0] + stab_size, coords[1][1]],
-                        ]
+                    ]
                 else:
                     s_coords = [
                         [coords[0][0], coords[0][1] - stab_size],
                         [coords[0][0], coords[0][1] + stab_size],
                         [coords[1][0], coords[1][1] - stab_size],
                         [coords[1][0], coords[1][1] + stab_size],
-                        ]
+                    ]
                 s_coords = list(sort_points(s_coords))
                 s_coords.append(s_coords[0])
                 s_coords = np.array(s_coords)
@@ -213,7 +219,8 @@ class QECPlot:
                             color="black",
                             width=2,
                         ),
-                        hoverinfo="none",
+                        text=stab_hover_text,
+                        hoverinfo="text",
                         legendgroup=f"stabs_{legend_qb}",
                         showlegend=i == 0,
                     )

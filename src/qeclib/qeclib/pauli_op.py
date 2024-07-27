@@ -1,4 +1,5 @@
 from pydantic.dataclasses import dataclass
+
 Qubit = tuple[int, ...]
 
 
@@ -15,10 +16,9 @@ class PauliOp:
             )
 
     def __str__(self) -> str:
-        str_repr = ""
-        for i, qb in enumerate(self.data_qubits):
-            str_repr += f"{self.pauli_string[i]}_{qb}"
-        return str_repr
+        return " ".join(
+            f"{self.pauli_string[i]}_{qb}" for i, qb in enumerate(self.data_qubits)
+        )
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, PauliOp):
@@ -39,7 +39,7 @@ class PauliOp:
         sorted_tuples = sorted(enumerate(self.data_qubits), key=lambda x: x[1])
 
         # Reorder the string based on the sorted order of tuples
-        sorted_string = ''.join(tuple_to_char[index] for index, _ in sorted_tuples)
+        sorted_string = "".join(tuple_to_char[index] for index, _ in sorted_tuples)
 
         return PauliOp(sorted_string, [qb for _, qb in sorted_tuples])
 
