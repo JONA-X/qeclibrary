@@ -42,3 +42,13 @@ Demo notebooks are located in the `notebooks` folder:
 * Quantum memory experiment for rotated surface codes of increasing distance (without decoding): [memory_exp.ipynb](notebooks/memory_exp.ipynb)
 * Logical quantum state tomography for two d=3 rotated surface codes: [two_qubit_logical_QST.ipynb](notebooks/two_qubit_logical_QST.ipynb)
 * Split one 3x7 rotated surface code qubit into two d=3 codes: [split.ipynb](notebooks/split.ipynb)
+
+## Unit testing
+To run unit tests, either simply use the `unittest` module:
+```bash
+python -m unittest src/qeclib/tests/test_math.py
+```
+or the more advanced `pytest` module:
+```bash
+pytest src/qeclib/tests/test_math.py
+```
