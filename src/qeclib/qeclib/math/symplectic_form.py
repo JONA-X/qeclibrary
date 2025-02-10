@@ -37,14 +37,14 @@ def commute(op1: np.ndarray, op2: np.ndarray) -> bool:
     return commute
 
 
-def generate_group(vectors: np.ndarray) -> np.ndarray:
+def generate_group(vectors: np.ndarray | list[list]) -> np.ndarray:
     """Generate a list of all group elements for the group that is spanned by the given
     vectors. The group elements are represented as symplectic vectors and every element
     corresponds to a row of the returned matrix.
 
     Parameters
     ----------
-    vectors : np.ndarray
+    vectors : np.ndarray | list[list]
         Vectors that span the group. They do not need to be linearly independent.
 
     Returns
@@ -52,6 +52,7 @@ def generate_group(vectors: np.ndarray) -> np.ndarray:
     np.ndarray
         Group spanned by the given vectors. Each row corresponds to a group element.
     """
+    vectors = np.array(vectors)  # Accept also list of lists instead of np.ndarray
     m = vectors.shape[0]  # Number of basis vectors
     n = vectors.shape[1] // 2  # Number of qubits
 
