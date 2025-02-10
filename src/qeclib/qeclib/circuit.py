@@ -12,6 +12,7 @@ from .noise_models import NoiseModel
 from .measurement import Measurement
 from .stabilizer_measurement import StabilizerMeasurement
 from .syndrome import Syndrome
+from .definitions import internal_op_to_stim_map
 
 CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 Qubit = tuple[int, ...]
@@ -30,22 +31,6 @@ op_names: list[str] = [
     "MR",
     "Barrier",
 ]
-internal_op_to_stim_map: dict[str, str] = {
-    "R": "R",
-    "RX": "RX",
-    "X": "X",
-    "Y": "Y",
-    "Z": "Z",
-    "H": "H",
-    "CX": "CX",
-    "CY": "CY",
-    "CZ": "CZ",
-    "M": "M",
-    "MR": "MR",
-    "Barrier": "TICK",
-    "DEPOLARIZE1": "DEPOLARIZE1",
-    "DEPOLARIZE2": "DEPOLARIZE2",
-}
 
 # internal_op_to_qasm_str_map: dict[str, str] = {
 #     "R": "R",

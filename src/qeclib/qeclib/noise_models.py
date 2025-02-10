@@ -1,8 +1,14 @@
-CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
+from abc import ABC, abstractmethod
+from .definitions import CircuitList
 
 
-class NoiseModel:
-    pass
+class NoiseModel(ABC):
+    @abstractmethod
+    def add_errors_to_circuit(
+        self,
+        op_list: CircuitList,
+    ) -> CircuitList:
+        pass
 
 
 class PauliNoiseModel(NoiseModel):
@@ -21,7 +27,7 @@ class PauliNoiseModel(NoiseModel):
     def add_errors_to_circuit(
         self,
         op_list: CircuitList,
-    ) -> dict[str, float]:
+    ) -> CircuitList:
         op_list_with_errors = []
         for op in op_list:
             if op[0] == "R":
