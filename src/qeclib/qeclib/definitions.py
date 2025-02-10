@@ -1,3 +1,4 @@
+Qubit = tuple[int, ...]
 CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
 
 internal_op_to_stim_map: dict[str, str] = {

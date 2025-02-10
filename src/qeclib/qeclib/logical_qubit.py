@@ -8,9 +8,7 @@ from .pauli_op import PauliOp
 from .stabilizer import Stabilizer
 
 import numpy as np
-
-CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
-Qubit = tuple[int, ...]
+from .definitions import CircuitList, Qubit
 import pprint
 
 

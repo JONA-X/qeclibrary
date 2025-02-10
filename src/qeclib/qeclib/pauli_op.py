@@ -1,6 +1,5 @@
 from pydantic.dataclasses import dataclass
-
-Qubit = tuple[int, ...]
+from .definitions import Qubit
 
 
 @dataclass()

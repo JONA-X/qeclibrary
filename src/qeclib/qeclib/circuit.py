@@ -12,10 +12,7 @@ from .noise_models import NoiseModel
 from .measurement import Measurement
 from .stabilizer_measurement import StabilizerMeasurement
 from .syndrome import Syndrome
-from .definitions import internal_op_to_stim_map
-
-CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
-Qubit = tuple[int, ...]
+from .definitions import internal_op_to_stim_map, CircuitList, Qubit
 
 op_names: list[str] = [
     "R",

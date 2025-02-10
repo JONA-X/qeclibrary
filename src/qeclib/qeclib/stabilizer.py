@@ -3,8 +3,7 @@ from pydantic.dataclasses import dataclass
 import uuid
 
 from .pauli_op import PauliOp
-
-Qubit = tuple[int, ...]
+from .definitions import Qubit
 
 
 @dataclass()
