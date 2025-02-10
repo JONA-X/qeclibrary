@@ -158,3 +158,21 @@ def normalizer_distribution(
         n = len(stab_distribution) - 1
     distr = MacWilliams(n) @ stab_distribution
     return np.array(distr / distr[0], dtype=int)  # Normalize so that B_0 == 1
+
+
+def find_distance(stab_matrix: np.ndarray) -> int:
+    """Find the code distance of the stabilizer code with the given stabilizer matrix.
+
+    Parameters
+    ----------
+    stab_matrix : np.ndarray
+        Stabilizer matrix. Every row corresponds to a generator of the stabilizer group.
+
+    Returns
+    -------
+    int
+        Code distance of the stabilizer code.
+    """
+    A = stabilizer_distribution(stab_matrix)
+    B = normalizer_distribution(stab_distribution=A)
+    return np.where(B - A > 0)[0][0]

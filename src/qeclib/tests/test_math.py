@@ -7,6 +7,7 @@ from qeclib.math import (
     stabilizer_distribution,
     MacWilliams,
     normalizer_distribution,
+    find_distance,
 )
 
 
@@ -153,6 +154,10 @@ class TestMath(unittest.TestCase):
             ),
             (1, 0, 0, 16, 45, 144, 776, 1200, 4107, 3248, 4632, 1536, 679),
         )
+
+    def test_find_distance(self):
+        self.assertEqual(find_distance(self.stab_matrix_632), 2)
+        self.assertEqual(find_distance(self.stab_matrix_22_twisted_toric), 3)
 
 
 if __name__ == "__main__":
