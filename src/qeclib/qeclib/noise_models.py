@@ -15,14 +15,26 @@ class PauliNoiseModel(NoiseModel):
     def __init__(
         self,
         p: float,
-        p_2q: float,
-        p_reset: float,
-        p_mmt: float,
+        p_2q: float = None,
+        p_reset: float = None,
+        p_mmt: float = None,
     ):
         self.p = p
-        self.p_2q = p_2q
-        self.p_reset = p_reset
-        self.p_mmt = p_mmt
+
+        if p_2q is not None:
+            self.p_2q = p_2q
+        else:
+            self.p_2q = p
+
+        if p_reset is not None:
+            self.p_reset = p_reset
+        else:
+            self.p_reset = p
+
+        if p_mmt is not None:
+            self.p_mmt = p_mmt
+        else:
+            self.p_mmt = p
 
     def add_errors_to_circuit(
         self,
@@ -50,6 +62,11 @@ class PauliNoiseModel(NoiseModel):
                 op_list_with_errors += [
                     (op[0], op[1]),
                     ("DEPOLARIZE2", op[1], self.p_mmt),
+                ]
+            elif op[0][:18] == "OBSERVABLE_INCLUDE":
+                # Don't add any errors to the observable definitions
+                op_list_with_errors += [
+                    (op[0], op[1]),
                 ]
             else:
                 op_list_with_errors += [
