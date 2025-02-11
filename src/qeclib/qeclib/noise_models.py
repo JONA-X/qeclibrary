@@ -85,7 +85,7 @@ class PauliNoiseModel(NoiseModel):
             # Observables
             elif op[0][:18] == "OBSERVABLE_INCLUDE" or op[0] == "DETECTOR":
                 op_list_with_errors += [
-                    (op[0], op[1]),
+                    tuple([op[i] for i in range(len(op))]),
                 ]
             # All other operations
             else:

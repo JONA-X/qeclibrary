@@ -72,9 +72,14 @@ def convert_to_stim(
 
     # Operations of the circuit
     for op in operation_list:
+        # Operation name
         stim_circ += internal_op_to_stim_map[op[0]]
-        if op[0] in ["DEPOLARIZE1", "DEPOLARIZE2"]:
+
+        # Additional parameters
+        if op[0] in ["DEPOLARIZE1", "DEPOLARIZE2", "OBSERVABLE_INCLUDE", "DETECTOR"]:
             stim_circ += f"({op[2]})"
+
+        # Qubits/measurements that are involved
         if isinstance(op[1], int):
             stim_circ += f" {op[1]}"
         else:
