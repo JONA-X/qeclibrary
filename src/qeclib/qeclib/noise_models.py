@@ -42,36 +42,59 @@ class PauliNoiseModel(NoiseModel):
     ) -> CircuitList:
         op_list_with_errors = []
         for op in op_list:
+            # Reset
             if op[0] == "R":
                 op_list_with_errors += [
                     (op[0], op[1]),
-                    ("DEPOLARIZE1", op[1], self.p_reset),
                 ]
-            elif op[0] == "M":
+                if self.p_reset > 0:
+                    op_list_with_errors += [
+                        ("DEPOLARIZE1", op[1], self.p_reset),
+                    ]
+            # Measurement
+            elif op[0] in ["M", "MX", "MY"]:
+                if self.p_mmt > 0:
+                    op_list_with_errors += [
+                        ("DEPOLARIZE1", op[1], self.p_mmt),
+                    ]
                 op_list_with_errors += [
-                    ("DEPOLARIZE1", op[1], self.p_mmt),
                     (op[0], op[1]),
                 ]
+            # Measurement and reset
             elif op[0] == "MR":
+                if self.p_mmt > 0:
+                    op_list_with_errors += [
+                        ("DEPOLARIZE1", op[1], self.p_mmt),
+                    ]
                 op_list_with_errors += [
-                    ("DEPOLARIZE1", op[1], self.p_mmt),
                     (op[0], op[1]),
-                    ("DEPOLARIZE1", op[1], self.p_reset),
                 ]
+                if self.p_reset > 0:
+                    op_list_with_errors += [
+                        ("DEPOLARIZE1", op[1], self.p_reset),
+                    ]
+            # Controlled gates
             elif op[0] in ["CX", "CY", "CZ"]:
                 op_list_with_errors += [
                     (op[0], op[1]),
-                    ("DEPOLARIZE2", op[1], self.p_mmt),
                 ]
-            elif op[0][:18] == "OBSERVABLE_INCLUDE":
-                # Don't add any errors to the observable definitions
+                if self.p_2q > 0:
+                    op_list_with_errors += [
+                        ("DEPOLARIZE2", op[1], self.p_2q),
+                    ]
+            # Observables
+            elif op[0][:18] == "OBSERVABLE_INCLUDE" or op[0] == "DETECTOR":
                 op_list_with_errors += [
                     (op[0], op[1]),
                 ]
+            # All other operations
             else:
                 op_list_with_errors += [
                     (op[0], op[1]),
-                    ("DEPOLARIZE1", op[1], self.p),
                 ]
+                if self.p > 0:
+                    op_list_with_errors += [
+                        ("DEPOLARIZE1", op[1], self.p),
+                    ]
 
         return op_list_with_errors
