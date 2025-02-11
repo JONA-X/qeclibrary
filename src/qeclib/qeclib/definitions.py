@@ -12,6 +12,8 @@ internal_op_to_stim_map: dict[str, str] = {
     "CY": "CY",
     "CZ": "CZ",
     "M": "M",
+    "MX": "MX",
+    "MY": "MY",
     "MR": "MR",
     "Barrier": "TICK",
     "DEPOLARIZE1": "DEPOLARIZE1",
