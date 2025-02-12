@@ -8,6 +8,7 @@ from qeclib.math import (
     MacWilliams,
     normalizer_distribution,
     find_distance,
+    operator_set_commute,
 )
 
 
@@ -36,6 +37,20 @@ class TestMath(unittest.TestCase):
         S_Z5 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1]
         self.stab_matrix_22_twisted_toric = np.array(
             [S_X1, S_X2, S_X3, S_X4, S_X5, S_Z1, S_Z2, S_Z3, S_Z4, S_Z5]
+        )
+
+        # Stabilizer matrix of the rotated d=3 surface code
+        self.stab_matrix_surf17 = np.array(
+            [
+                [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+            ]
         )
 
     def test_commutation_function(self):
@@ -158,6 +173,77 @@ class TestMath(unittest.TestCase):
     def test_find_distance(self):
         self.assertEqual(find_distance(self.stab_matrix_632), 2)
         self.assertEqual(find_distance(self.stab_matrix_22_twisted_toric), 3)
+
+    def test_operator_set_commute(self):
+        # Check that the example stabilizer matrices commute
+        self.assertTrue(operator_set_commute(self.stab_matrix_632))
+        self.assertTrue(operator_set_commute(self.stab_matrix_22_twisted_toric))
+        self.assertTrue(operator_set_commute(self.stab_matrix_surf17))
+
+        # Check that the set of operators does not commute anymore when adding some
+        # random other non-commuting operators
+        self.assertFalse(
+            operator_set_commute(
+                np.vstack(
+                    (
+                        self.stab_matrix_surf17,
+                        np.array(
+                            [
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                            ]
+                        ),
+                    )
+                )
+            )
+        )
+        self.assertFalse(
+            operator_set_commute(
+                np.vstack(
+                    (
+                        self.stab_matrix_surf17,
+                        np.array(
+                            [
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                            ]
+                        ),
+                    )
+                )
+            )
+        )
 
 
 if __name__ == "__main__":

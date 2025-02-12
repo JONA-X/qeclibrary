@@ -3,14 +3,14 @@ import itertools
 from scipy.special import comb
 
 
-def commute(op1: np.ndarray, op2: np.ndarray) -> bool:
+def commute(op1: np.ndarray | list[int], op2: np.ndarray | list[int]) -> bool:
     """Return whether two pauli operators commute or anticommute.
 
     Parameters
     ----------
-    op1 : np.ndarray
+    op1 : np.ndarray | list[int]
         Operator 1 in symplectic vector representation.
-    op2 : np.ndarray
+    op2 : np.ndarray | list[int]
         Operator 2 in symplectic vector representation.
 
     Returns
@@ -176,3 +176,23 @@ def find_distance(stab_matrix: np.ndarray) -> int:
     A = stabilizer_distribution(stab_matrix)
     B = normalizer_distribution(stab_distribution=A)
     return np.where(B - A > 0)[0][0]
+
+
+def operator_set_commute(operators: np.ndarray | list[list[int]]) -> bool:
+    """Check whether the given set of operators commute pairwise.
+
+    Parameters
+    ----------
+    operators : np.ndarray | list[list[int]]
+        List of operators in symplectic vector representation.
+
+    Returns
+    -------
+    bool
+        True if all operators commute with each other respectively, False otherwise.
+    """
+    for i in range(len(operators)):
+        for j in np.arange(i + 1, len(operators)):
+            if not commute(operators[i], operators[j]):
+                return False
+    return True
