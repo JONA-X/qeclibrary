@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import warnings
 
 from qeclib.math import (
     commute,
@@ -9,6 +10,7 @@ from qeclib.math import (
     normalizer_distribution,
     find_distance,
     operator_set_commute,
+    is_valid_tableau,
 )
 
 
@@ -38,6 +40,111 @@ class TestMath(unittest.TestCase):
         self.stab_matrix_22_twisted_toric = np.array(
             [S_X1, S_X2, S_X3, S_X4, S_X5, S_Z1, S_Z2, S_Z3, S_Z4, S_Z5]
         )
+        log_X1 = [
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]
+        log_Z1 = [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+        ]
+        log_X2 = [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+        ]
+        log_Z2 = [
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]
+        self.log_ops_22_twisted_toric = [(log_X1, log_Z1), (log_X2, log_Z2)]
 
         # Stabilizer matrix of the rotated d=3 surface code
         self.stab_matrix_surf17 = np.array(
@@ -52,6 +159,12 @@ class TestMath(unittest.TestCase):
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
             ]
         )
+        self.log_ops_surf17 = [
+            (
+                [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+            )
+        ]
 
     def test_commutation_function(self):
         op1 = [1, 0, 0, 0]  # XI
@@ -245,6 +358,136 @@ class TestMath(unittest.TestCase):
                 )
             )
         )
+
+    def test_is_valid_tableau(self):
+        # Check that default definition yields a valid tableau
+        self.assertTrue(is_valid_tableau(self.stab_matrix_surf17, self.log_ops_surf17))
+        # Relabel X_L and Z_L. Should still be a valid tableau
+        self.assertTrue(
+            is_valid_tableau(
+                self.stab_matrix_surf17,
+                [
+                    (
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                        [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    )
+                ],
+            )
+        )
+        # Define X and Z the wrong way around, i.e. swap first column vs first row
+        self.assertFalse(
+            is_valid_tableau(
+                self.stab_matrix_surf17,
+                [
+                    (
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0],
+                        [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    )
+                ],
+            )
+        )
+        # Randomly modify the operators
+        self.assertFalse(
+            is_valid_tableau(
+                self.stab_matrix_surf17,
+                [
+                    (
+                        [1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                    )
+                ],
+            )
+        )
+        # Use two different X operators, i.e. the pair does not commute
+        self.assertFalse(
+            is_valid_tableau(
+                self.stab_matrix_surf17,
+                [
+                    (
+                        [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    )
+                ],
+            )
+        )
+
+        # Check twisted toric code
+        self.assertTrue(
+            is_valid_tableau(
+                self.stab_matrix_22_twisted_toric, self.log_ops_22_twisted_toric
+            )
+        )
+        # Mix up the logical operators so that the commutation/anticommutation relations are not satisfied
+        self.assertFalse(
+            is_valid_tableau(
+                self.stab_matrix_22_twisted_toric,
+                [
+                    (
+                        self.log_ops_22_twisted_toric[0][0],
+                        self.log_ops_22_twisted_toric[1][1],
+                    ),
+                    (
+                        self.log_ops_22_twisted_toric[1][0],
+                        self.log_ops_22_twisted_toric[0][1],
+                    ),
+                ],
+            )
+        )
+        # Add one of the logical operators to the stabilizer list
+        self.assertFalse(
+            is_valid_tableau(
+                np.vstack(
+                    (
+                        self.stab_matrix_22_twisted_toric,
+                        self.log_ops_22_twisted_toric[0][0],
+                    )
+                ),
+                self.log_ops_22_twisted_toric,
+            )
+        )
+        # Check warning if the system is not fully defined:
+        # - remove one stabilizer from the list
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            is_valid_tableau(
+                self.stab_matrix_22_twisted_toric[:-2], self.log_ops_22_twisted_toric
+            )
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The system is not fully defined, i.e. m + k < n",
+            )
+        # - provide only one logical operator pair and not both
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            is_valid_tableau(
+                self.stab_matrix_22_twisted_toric, [self.log_ops_22_twisted_toric[0]]
+            )
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The system is not fully defined, i.e. m + k < n",
+            )
+        # Check warning if the system is over-defined:
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            is_valid_tableau(
+                np.vstack(
+                    (
+                        self.stab_matrix_22_twisted_toric,
+                        self.stab_matrix_22_twisted_toric,
+                    )
+                ),
+                self.log_ops_22_twisted_toric,
+            )
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The system is over-defined, i.e. m + k > n. The stabilizers or logical operators are not independent.",
+            )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 from scipy.special import comb
+import warnings
 
 
 def commute(op1: np.ndarray | list[int], op2: np.ndarray | list[int]) -> bool:
@@ -195,4 +196,86 @@ def operator_set_commute(operators: np.ndarray | list[list[int]]) -> bool:
         for j in np.arange(i + 1, len(operators)):
             if not commute(operators[i], operators[j]):
                 return False
+    return True
+
+
+def is_valid_tableau(
+    stabilizers: np.ndarray,
+    logical_operators: list[tuple[tuple[int, ...], tuple[int, ...]]],
+) -> bool:
+    """Check whether the given stabilizer tableau is valid, i.e. whether it satisfies
+    the following conditions:
+    - All stabilizers commute with each other
+    - All logical operators commute with all stabilizers
+    - For every pair (X_Li, Z_Li) of logical operators, X_Li and Z_Li anticommute
+    - All logical operators commute with each other, except for other operator of the
+    respective pair. I.e. X_Li and Z_Li commute with every X_Lj and Z_Lj for j != i
+
+    Parameters
+    ----------
+    stabilizers : np.ndarray
+        Stabilizer matrix where every row corresponds to a stabilizer generator in the
+        symplectic vector representation.
+    logical_operators : list[tuple[tuple[int, ...], tuple[int, ...]]]
+        List of logical operator pairs where every tuple contains the X and Z operator
+        in symplectic vector representation.
+
+    Returns
+    -------
+    bool
+        True if the tableau is valid, False otherwise.
+
+    Raises
+    ------
+    Warning
+        Print a warning if the system is not fully defined, i.e. if m + k != n
+    """
+    # Check that all stabilizers commute with each other
+    if not operator_set_commute(stabilizers):
+        return False
+
+    # Check for every logical operator:
+    for i in range(len(logical_operators)):
+        # Check that the logical operators commute with the stabilizers
+        if not operator_set_commute(
+            np.vstack((stabilizers, logical_operators[i][0]))
+        ) or not operator_set_commute(
+            np.vstack((stabilizers, logical_operators[i][1]))
+        ):
+            return False
+
+        # Check that the logical operator pair anticommutes
+        if commute(logical_operators[i][0], logical_operators[i][1]):
+            return False
+
+        # Check that they commute with all other logical operators
+        for j in np.arange(i + 1, len(logical_operators)):
+            if (
+                not commute(logical_operators[i][0], logical_operators[j][0])
+                or not commute(logical_operators[i][0], logical_operators[j][1])
+                or not commute(logical_operators[i][1], logical_operators[j][0])
+                or not commute(logical_operators[i][1], logical_operators[j][1])
+            ):
+                return False
+
+    # Check that the system is fully defined
+    n_qubits = stabilizers.shape[1] // 2
+    warnings.simplefilter("always", UserWarning)
+    if (
+        np.linalg.matrix_rank(
+            np.vstack(
+                (
+                    stabilizers,
+                    [logical_operators[i][0] for i in range(len(logical_operators))],
+                )
+            )
+        )
+        < n_qubits
+    ):
+        warnings.warn("The system is not fully defined, i.e. m + k < n")
+    if len(stabilizers) + len(logical_operators) > n_qubits:
+        warnings.warn(
+            "The system is over-defined, i.e. m + k > n. The stabilizers or logical operators are not independent."
+        )
+
     return True
