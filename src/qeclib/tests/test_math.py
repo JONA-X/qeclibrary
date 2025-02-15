@@ -173,6 +173,7 @@ class TestMath(unittest.TestCase):
     def test_find_distance(self):
         self.assertEqual(find_distance(self.stab_matrix_632), 2)
         self.assertEqual(find_distance(self.stab_matrix_22_twisted_toric), 3)
+        self.assertEqual(find_distance(self.stab_matrix_surf17), 3)
 
     def test_operator_set_commute(self):
         # Check that the example stabilizer matrices commute
