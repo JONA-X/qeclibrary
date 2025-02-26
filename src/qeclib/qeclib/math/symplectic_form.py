@@ -73,7 +73,7 @@ def generate_group(vectors: np.ndarray | list[list]) -> np.ndarray:
 
 def stabilizer_distribution(stab_matrix: np.ndarray) -> np.ndarray:
     """Calculate the first Shor-Laflamme distribution of the stabilizer weights. The
-    distribution is a vector `A = (A_0, ..., A_{n+1})` where `A_i` is the number of
+    distribution is a vector `A = (A_0, ..., A_n)` where `A_i` is the number of
     stabilizers with weight `i`. Note that `A_0` is always one since the identity has
     weight zero and is always part of the stabilizer group.
 
@@ -128,7 +128,7 @@ def normalizer_distribution(
 ) -> np.ndarray:
     """Calculate the second Shor-Laflamme distribution of the normalizer weights of the
     normalizer N(S) of the given stabilizer group S. The distribution is a vector
-    `B = (B_0, ..., B_{n+1})` where `B_i` is the number of elements in the normalizer
+    `B = (B_0, ..., B_n)` where `B_i` is the number of elements in the normalizer
     with weight `i`. Note that `B_0` is always one since the identity has weight zero
     and is always part of the normalizer N(S).
 
@@ -287,3 +287,88 @@ def is_valid_tableau(
         )
 
     return True
+
+
+def cartesian_product_of_sets(set1: np.ndarray, set2: np.ndarray) -> np.ndarray:
+    """Calculates the Cartesian product of two sets in binary symplectic
+    representation. I.e. return all possible combinations of elements from the two sets.
+
+    Parameters
+    ----------
+    set1 : np.ndarray
+        Set 1, expressed as a matrix where the rows are the elements of the set in
+        binary symplectic representation.
+    set2 : np.ndarray
+        Set 2, expressed as a matrix where the rows are the elements of the set in
+        binary symplectic representation.
+
+    Returns
+    -------
+    np.ndarray
+        Cartesian product of the two sets, expressed as a matrix where the rows are
+        the elements of the set in binary symplectic representation.
+    """
+    # Note: Use a set to avoid duplicates
+    # This requires elements of the set to be hashable, therefore use tuples instead of
+    # lists or numpy arrays
+    return {tuple((el1 + el2) % 2) for el1 in set1 for el2 in set2}
+
+
+def get_log_op_distribution(
+    log_ops: np.ndarray, stabilizer_matrix: np.ndarray
+) -> list[int]:
+    """Get the weight distribution of a given logical operator group with respect to a
+    stabilizer group. The weight distribution is a vector `B = (B_0, ..., B_n)` where
+    `B_i` is the number of logical operators with weight `i`.
+
+    Parameters
+    ----------
+    log_ops : np.ndarray
+        Every row corresponds to a logical operator in symplectic vector representation.
+    stabilizer_matrix : np.ndarray
+        Every row corresponds to a stabilizer in symplectic vector representation. It's
+        enough to provide the generators of the stabilizer group.
+
+    Returns
+    -------
+    list[int]
+        Weight distribution of the logical operators
+    """
+    stabilizer_matrix = np.array(stabilizer_matrix)
+    n = len(stabilizer_matrix[0]) // 2  # Number of qubits
+    all_ops = cartesian_product_of_sets(
+        generate_group(log_ops), generate_group(stabilizer_matrix)
+    )
+    weights = [np.sum(np.array(op[:n]) + np.array(op[n:]) > 0) for op in all_ops]
+    distribution = np.zeros(n + 1, dtype=int)
+    for weight in weights:
+        distribution[weight] += 1
+    return list(distribution)
+
+
+def F2_to_xyz(operator: list[int]) -> str:
+    """Convert a binary symplectic vector representation over F2 of a Pauli operator to
+    a string representation containing the Pauli operators X, Y, Z, and I.
+
+    Parameters
+    ----------
+    operator : list[int]
+        Pauli operator in binary symplectic vector representation over F2.
+
+    Returns
+    -------
+    str
+        String representation of the Pauli operator.
+    """
+    n = len(operator) // 2  # Number of qubits
+    str_rep = ""
+    for i in range(n):
+        if operator[i] == 1 and operator[i + n] == 0:
+            str_rep += "X"
+        elif operator[i] == 0 and operator[i + n] == 1:
+            str_rep += "Z"
+        elif operator[i] == 1 and operator[i + n] == 1:
+            str_rep += "Y"
+        else:
+            str_rep += "I"
+    return str_rep

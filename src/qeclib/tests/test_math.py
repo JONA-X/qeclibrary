@@ -11,6 +11,9 @@ from qeclib.math import (
     find_distance,
     operator_set_commute,
     is_valid_tableau,
+    cartesian_product_of_sets,
+    get_log_op_distribution,
+    F2_to_xyz,
 )
 
 
@@ -534,6 +537,51 @@ class TestMath(unittest.TestCase):
                 str(warning_list[0].message),
                 "The system is over-defined, i.e. m + k > n. The stabilizers or logical operators are not independent.",
             )
+
+    def test_cartesian_product_of_sets(self):
+        set1 = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+        set2 = np.array([[0, 0, 1, 0]])
+        expected_set = {
+            (1, 0, 1, 0),
+            (0, 1, 1, 0),
+        }
+        self.assertEqual(cartesian_product_of_sets(set1, set2), expected_set)
+
+        # Let's consider actual groups
+        group1 = np.array([[0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [1, 1, 0, 0]])
+        group2 = np.array([[0, 0, 0, 0], [0, 0, 1, 0]])
+        expected_group = {
+            (0, 0, 0, 0),
+            (1, 0, 0, 0),
+            (0, 1, 0, 0),
+            (1, 1, 0, 0),
+            (0, 0, 1, 0),
+            (1, 0, 1, 0),
+            (0, 1, 1, 0),
+            (1, 1, 1, 0),
+        }
+        self.assertEqual(cartesian_product_of_sets(group1, group2), expected_group)
+
+    def test_get_log_op_distribution(self):
+        # Check that the distribution of the logical operators is correct for the
+        # 22 qubit twisted toric code
+        log_ops = [
+            self.log_ops_22_twisted_toric[i][j] for i in range(2) for j in range(2)
+        ]
+        distr = get_log_op_distribution(log_ops, self.stab_matrix_22_twisted_toric)
+        self.assertEqual(
+            distr,
+            [1, 0, 0, 16, 45, 144, 776, 1200, 4107, 3248, 4632, 1536, 679],
+        )
+
+    def test_F2_to_xyz(self):
+        self.assertEqual(F2_to_xyz([1, 0]), "X")
+        self.assertEqual(F2_to_xyz([0, 1]), "Z")
+        self.assertEqual(F2_to_xyz([1, 1]), "Y")
+        self.assertEqual(F2_to_xyz([1, 0, 0, 0]), "XI")
+        self.assertEqual(F2_to_xyz([0, 1, 0, 0]), "IX")
+        self.assertEqual(F2_to_xyz([1, 0, 1, 1]), "YZ")
+        self.assertEqual(F2_to_xyz([0, 1, 0, 0, 0, 0, 1, 0, 0, 0]), "IYIII")
 
 
 if __name__ == "__main__":
