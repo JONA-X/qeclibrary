@@ -232,6 +232,7 @@ def is_valid_tableau(
     """
     # Check that all stabilizers commute with each other
     if not operator_set_commute(stabilizers):
+        warnings.warn("The stabilizers do not commute.")
         return False
 
     # Check for every logical operator:
@@ -242,10 +243,14 @@ def is_valid_tableau(
         ) or not operator_set_commute(
             np.vstack((stabilizers, logical_operators[i][1]))
         ):
+            warnings.warn("The logical operators do not commute with all stabilizers.")
             return False
 
         # Check that the logical operator pair anticommutes
         if commute(logical_operators[i][0], logical_operators[i][1]):
+            warnings.warn(
+                "The pairs of logical operators do not anticommute respectively."
+            )
             return False
 
         # Check that they commute with all other logical operators
@@ -256,6 +261,9 @@ def is_valid_tableau(
                 or not commute(logical_operators[i][1], logical_operators[j][0])
                 or not commute(logical_operators[i][1], logical_operators[j][1])
             ):
+                warnings.warn(
+                    "The logical operators do not commute with the logical operators of other pairs."
+                )
                 return False
 
     # Check that the system is fully defined

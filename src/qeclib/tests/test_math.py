@@ -374,42 +374,69 @@ class TestMath(unittest.TestCase):
                 ],
             )
         )
+
         # Define X and Z the wrong way around, i.e. swap first column vs first row
-        self.assertFalse(
-            is_valid_tableau(
-                self.stab_matrix_surf17,
-                [
-                    (
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0],
-                        [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    )
-                ],
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            self.assertFalse(
+                is_valid_tableau(
+                    self.stab_matrix_surf17,
+                    [
+                        (
+                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0],
+                            [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        )
+                    ],
+                )
             )
-        )
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The logical operators do not commute with all stabilizers.",
+            )
+
         # Randomly modify the operators
-        self.assertFalse(
-            is_valid_tableau(
-                self.stab_matrix_surf17,
-                [
-                    (
-                        [1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                    )
-                ],
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            self.assertFalse(
+                is_valid_tableau(
+                    self.stab_matrix_surf17,
+                    [
+                        (
+                            [1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                        )
+                    ],
+                )
             )
-        )
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The logical operators do not commute with all stabilizers.",
+            )
+
         # Use two different X operators, i.e. the pair does not commute
-        self.assertFalse(
-            is_valid_tableau(
-                self.stab_matrix_surf17,
-                [
-                    (
-                        [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    )
-                ],
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            self.assertFalse(
+                is_valid_tableau(
+                    self.stab_matrix_surf17,
+                    [
+                        (
+                            [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        )
+                    ],
+                )
             )
-        )
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The pairs of logical operators do not anticommute respectively.",
+            )
 
         # Check twisted toric code
         self.assertTrue(
@@ -418,33 +445,52 @@ class TestMath(unittest.TestCase):
             )
         )
         # Mix up the logical operators so that the commutation/anticommutation relations are not satisfied
-        self.assertFalse(
-            is_valid_tableau(
-                self.stab_matrix_22_twisted_toric,
-                [
-                    (
-                        self.log_ops_22_twisted_toric[0][0],
-                        self.log_ops_22_twisted_toric[1][1],
-                    ),
-                    (
-                        self.log_ops_22_twisted_toric[1][0],
-                        self.log_ops_22_twisted_toric[0][1],
-                    ),
-                ],
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            self.assertFalse(
+                is_valid_tableau(
+                    self.stab_matrix_22_twisted_toric,
+                    [
+                        (
+                            self.log_ops_22_twisted_toric[0][0],
+                            self.log_ops_22_twisted_toric[1][1],
+                        ),
+                        (
+                            self.log_ops_22_twisted_toric[1][0],
+                            self.log_ops_22_twisted_toric[0][1],
+                        ),
+                    ],
+                )
             )
-        )
-        # Add one of the logical operators to the stabilizer list
-        self.assertFalse(
-            is_valid_tableau(
-                np.vstack(
-                    (
-                        self.stab_matrix_22_twisted_toric,
-                        self.log_ops_22_twisted_toric[0][0],
-                    )
-                ),
-                self.log_ops_22_twisted_toric,
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The pairs of logical operators do not anticommute respectively.",
             )
-        )
+
+        # Add one of the logical operators to the stabilizer list.
+        # Then the logical operators do not commute with all "stabilizers" anymore.
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            self.assertFalse(
+                is_valid_tableau(
+                    np.vstack(
+                        (
+                            self.stab_matrix_22_twisted_toric,
+                            self.log_ops_22_twisted_toric[0][0],
+                        )
+                    ),
+                    self.log_ops_22_twisted_toric,
+                )
+            )
+            self.assertEqual(len(warning_list), 1)
+            self.assertIs(warning_list[0].category, UserWarning)
+            self.assertEqual(
+                str(warning_list[0].message),
+                "The logical operators do not commute with all stabilizers.",
+            )
+
         # Check warning if the system is not fully defined:
         # - remove one stabilizer from the list
         with warnings.catch_warnings(record=True) as warning_list:
