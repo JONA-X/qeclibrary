@@ -1,5 +1,6 @@
 Qubit = tuple[int, ...]
 CircuitList = list[tuple[str, list[int | tuple[int, int]]]]
+StabilizerTuple = tuple[str, list[int], int]
 
 internal_op_to_stim_map: dict[str, str] = {
     "R": "R",
