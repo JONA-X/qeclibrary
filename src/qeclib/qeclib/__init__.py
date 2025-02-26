@@ -8,4 +8,5 @@ from .stabilizer_measurement import StabilizerMeasurement
 from .syndrome import Syndrome
 from .utilities import *
 from .circ_utilities import *
+from .stim_utilities import *
 from visualizer import *
